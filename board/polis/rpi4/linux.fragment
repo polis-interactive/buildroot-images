@@ -1,0 +1,23 @@
+# Keep the UART for the test; never send kernel console traffic to it.
+CONFIG_SERIAL_AMBA_PL011=y
+# CONFIG_SERIAL_AMBA_PL011_CONSOLE is not set
+CONFIG_NULL_TTY=y
+
+# Load Wi-Fi after the root filesystem (including firmware) is available.
+CONFIG_WLAN=y
+CONFIG_CFG80211=m
+CONFIG_WLAN_VENDOR_BROADCOM=y
+CONFIG_BRCMFMAC=m
+CONFIG_BRCMFMAC_SDIO=y
+
+# The test has no Ethernet, USB, Bluetooth, display, camera, or audio.
+# CONFIG_ETHERNET is not set
+# CONFIG_USB_SUPPORT is not set
+# CONFIG_BT is not set
+# CONFIG_DRM is not set
+# CONFIG_FB is not set
+# CONFIG_FB_CORE is not set
+# CONFIG_FRAMEBUFFER_CONSOLE is not set
+# CONFIG_VT is not set
+# CONFIG_SOUND is not set
+# CONFIG_MEDIA_SUPPORT is not set

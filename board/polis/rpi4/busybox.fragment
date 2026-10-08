@@ -1,0 +1,3 @@
+# No scheduled jobs in the baseline image; omit the cron daemon and startup.
+# CONFIG_CROND is not set
+# CONFIG_CRONTAB is not set

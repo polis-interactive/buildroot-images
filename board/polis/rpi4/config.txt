@@ -1,0 +1,13 @@
+# Based on Buildroot 2026.08 board/raspberrypi/config_4_64bit.txt.
+start_file=start4.elf
+fixup_file=fixup4.dat
+kernel=Image
+arm_64bit=1
+
+# Headless test appliance.
+disable_splash=1
+dtparam=audio=off
+
+# Free PL011 UART0 for the test on GPIO14/15, not a login console.
+dtoverlay=disable-bt
+enable_uart=1
