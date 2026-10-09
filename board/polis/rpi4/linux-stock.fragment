@@ -1,0 +1,3 @@
+# Make GPIO access available to the early blinky process before rcS.
+CONFIG_RASPBERRYPI_GPIOMEM=y
+CONFIG_GPIO_CDEV=y

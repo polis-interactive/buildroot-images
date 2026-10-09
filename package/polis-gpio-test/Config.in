@@ -1,0 +1,14 @@
+config BR2_PACKAGE_POLIS_GPIO_TEST
+	bool "polis-gpio-test"
+	depends on BR2_aarch64
+	depends on BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	select BR2_PACKAGE_HOST_RUSTC
+	select BR2_PACKAGE_POLIS_FIRMWARE_TOOLS
+	help
+	  Early Tokio/RPPAL GPIO blink test for the Polis Pi 4.
+	  Blinks BCM GPIO26 once UART opens without transmitting, then
+	  BCM GPIO19 once boot diagnostics are saved to the mounted /data
+	  partition. Both toggle independently every 500 ms. GPIO startup
+	  runs before storage and rcS; log export waits in the background.
+	  Needs built-in GPIO access and the install-gpio-test.py hook.

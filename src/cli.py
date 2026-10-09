@@ -32,7 +32,8 @@ def parser() -> argparse.ArgumentParser:
     for name in ("images", "flash"):
         command = commands.add_parser(name, parents=[common],
                                       help="list images" if name == "images" else "select and flash an SD-card image")
-        command.add_argument("--output", type=Path, help="additional output directory to search")
+        if name == "images":
+            command.add_argument("--output", type=Path, help="additional output directory to search")
         if name == "flash":
             command.add_argument("--image", type=Path)
             command.add_argument("--device", type=Path)
@@ -87,7 +88,7 @@ def main(argv=None) -> int:
         elif args.command == "devices":
             images.show_disks(images.disks())
         elif args.command == "flash":
-            images.flash(ctx, args.image, args.device, args.output, expand_data=args.expand_data)
+            images.flash(ctx, args.image, args.device, expand_data=args.expand_data)
         elif args.command == "smoke":
             name = args.snapshot or choose(snapshots.completed(ctx), "Snapshot")
             if name is None:

@@ -6,3 +6,4 @@
 /.cache/
 __pycache__/
 *.pyc
+/package/polis-gpio-test/app/target/

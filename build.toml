@@ -1,0 +1,82 @@
+# Project build policy. Paths are relative to this repository unless absolute.
+# Config-path values follow Buildroot's path convention (relative to Buildroot).
+schema = 1
+includes = ["package/*/build.toml"]
+exclude = ["target", ".git", "__pycache__", "*.pyc"]
+
+[variables]
+BR2_EXTERNAL_POLIS_PATH = "{repo}"
+TOPDIR = "{buildroot}"
+BASE_DIR = "{output}"
+
+[defaults]
+inputs = ["{buildroot}/Makefile", "external.mk", "src/builds.py", "src/incremental.py"]
+config = ["BR2_ARCH*", "BR2_aarch64", "BR2_ARM*", "BR2_cortex*", "BR2_TOOLCHAIN*", "BR2_GCC*", "BR2_TARGET_OPTIMIZATION", "BR2_TARGET_LDFLAGS", "BR2_SHARED*", "BR2_STATIC*", "BR2_ENABLE_DEBUG", "BR2_DEBUG*", "BR2_OPTIMIZE*", "BR2_REPRODUCIBLE"]
+
+[configure]
+targets = ["{board}_defconfig"]
+inputs = ["configs/{board}_defconfig", "Config.in", "external.desc", "package/Config.in", "package/*/Config.in", "{buildroot}/Config.in", "{buildroot}/Config.in.legacy", "{buildroot}/arch/Config.in*", "{buildroot}/toolchain/Config.in*"]
+outputs = ["{output}/.config"]
+
+[image]
+targets = ["all"]
+inputs = ["board", "package", "patches", "Config.in", "configs/{board}_defconfig"]
+config = ["*"]
+config_paths = ["BR2_ROOTFS_OVERLAY", "BR2_ROOTFS_PRE_BUILD_SCRIPT", "BR2_ROOTFS_POST_BUILD_SCRIPT", "BR2_ROOTFS_POST_FAKEROOT_SCRIPT", "BR2_ROOTFS_POST_IMAGE_SCRIPT", "BR2_ROOTFS_DEVICE_TABLE", "BR2_ROOTFS_STATIC_DEVICE_TABLE", "BR2_ROOTFS_USERS_TABLES"]
+outputs = ["{output}/images/sdcard.img", "{output}/images"]
+
+[[steps]]
+name = "kernel-source"
+when = "BR2_LINUX_KERNEL"
+targets = ["linux-dirclean"]
+inputs = ["{buildroot}/linux", "{buildroot}/board/raspberrypi/patches/linux", "patches/*/linux"]
+config = ["BR2_LINUX_KERNEL_VERSION", "BR2_LINUX_KERNEL_CUSTOM_VERSION*", "BR2_LINUX_KERNEL_CUSTOM_TARBALL*", "BR2_LINUX_KERNEL_CUSTOM_GIT*", "BR2_LINUX_KERNEL_CUSTOM_HG*", "BR2_LINUX_KERNEL_CUSTOM_SVN*", "BR2_GLOBAL_PATCH_DIR"]
+config_paths = ["BR2_LINUX_KERNEL_PATCH"]
+# Recorded after the dependent kernel rule has extracted/patched/built it.
+outputs = ["{output}/build/linux-*/.stamp_patched"]
+
+[[steps]]
+name = "kernel"
+when = "BR2_LINUX_KERNEL"
+depends_on = ["kernel-source"]
+targets = ["linux-reconfigure"]
+inputs = ["{buildroot}/linux"]
+config = ["BR2_LINUX_KERNEL*"]
+config_paths = ["BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE", "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES", "BR2_LINUX_KERNEL_CUSTOM_DTS_PATH", "BR2_LINUX_KERNEL_CUSTOM_DTS_DIR", "BR2_LINUX_KERNEL_CUSTOM_LOGO_PATH"]
+outputs = ["{output}/build/linux-*/.stamp_built", "{output}/build/linux-*/.config", "{output}/images/Image"]
+
+[[steps]]
+name = "busybox-source"
+when = "BR2_PACKAGE_BUSYBOX"
+targets = ["busybox-dirclean"]
+inputs = ["{buildroot}/package/busybox", "patches/*/busybox"]
+config = ["BR2_GLOBAL_PATCH_DIR"]
+outputs = ["{output}/build/busybox-*/.stamp_patched"]
+
+[[steps]]
+name = "busybox"
+when = "BR2_PACKAGE_BUSYBOX"
+depends_on = ["busybox-source"]
+targets = ["busybox-reconfigure"]
+inputs = ["{buildroot}/package/busybox"]
+config = ["BR2_PACKAGE_BUSYBOX*", "BR2_INIT_*", "BR2_POLIS_PREFER_STATIC"]
+config_paths = ["BR2_PACKAGE_BUSYBOX_CONFIG", "BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES"]
+outputs = ["{output}/build/busybox-*/.stamp_built", "{output}/build/busybox-*/.config", "{output}/target/bin/busybox"]
+
+[[steps]]
+name = "firmware-source"
+when = "BR2_PACKAGE_RPI_FIRMWARE"
+targets = ["rpi-firmware-dirclean"]
+inputs = ["{buildroot}/package/rpi-firmware", "patches/*/rpi-firmware"]
+config = ["BR2_GLOBAL_PATCH_DIR"]
+outputs = ["{output}/build/rpi-firmware-*/.stamp_patched"]
+
+[[steps]]
+name = "firmware"
+when = "BR2_PACKAGE_RPI_FIRMWARE"
+depends_on = ["firmware-source"]
+targets = ["rpi-firmware-reinstall"]
+inputs = ["{buildroot}/package/rpi-firmware"]
+config = ["BR2_PACKAGE_RPI_FIRMWARE*"]
+config_paths = ["BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE", "BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE", "BR2_PACKAGE_RPI_FIRMWARE_EXTRA_FILES"]
+outputs = ["{output}/images/rpi-firmware"]

@@ -1,4 +1,5 @@
-# Add source statements for custom package Config.in files here.
+source "$BR2_EXTERNAL_POLIS_PATH/package/polis-gpio-test/Config.in"
+source "$BR2_EXTERNAL_POLIS_PATH/package/polis-firmware-tools/Config.in"
 
 config BR2_POLIS_PREFER_STATIC
 	bool "Prefer static executables in the Polis image"

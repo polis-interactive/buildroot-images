@@ -167,9 +167,10 @@ def inspect_destination(device: Path, image_size: int) -> tuple:
 
 
 def flash(ctx: Context, image: Path | None, device: Path | None,
-          output: Path | None = None, *, expand_data: bool = False) -> None:
+          *, expand_data: bool = False) -> None:
     if image is None:
-        image = choose(discover_images(ctx, output), "Image")
+        image = choose([(ctx.snapshots / name / "images/sdcard.img").resolve()
+                        for name in snapshots.completed(ctx)], "Image")
         if image is None:
             return
     if not sys.stdin.isatty():
@@ -187,11 +188,11 @@ def flash(ctx: Context, image: Path | None, device: Path | None,
             raise UserError(f"--expand-data requires these host tools: {', '.join(missing)}")
         layout = data_layout(image, image_identity.st_size)
         check_data_filesystem(image, layout["partitions"][2])
-    nodes = disks()
+    nodes = [node for node in disks() if node["type"] == "disk" and node.get("rm")]
     show_disks(nodes)
     if device is None:
-        # Whole disks are offered explicitly; mounted disks are still refused below.
-        selected = choose([n["name"] for n in nodes if n["type"] == "disk"], "Device")
+        # Removable whole disks only; mounted cards are still refused below.
+        selected = choose([n["name"] for n in nodes], "Device")
         if selected is None:
             return
         device = Path(selected)

@@ -24,5 +24,5 @@ if [ ! -d /data/var-lib ]; then
 fi
 mount /var/lib
 # 'ro' on the command line does not make an unpacked initramfs read-only.
-# Check/enforce it for every variant before any service is allowed to start.
+# Check/enforce it before rcS services; the stateless GPIO test starts earlier.
 mount -o remount,ro /

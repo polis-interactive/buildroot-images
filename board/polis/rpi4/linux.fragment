@@ -3,6 +3,10 @@ CONFIG_SERIAL_AMBA_PL011=y
 # CONFIG_SERIAL_AMBA_PL011_CONSOLE is not set
 CONFIG_NULL_TTY=y
 
+# Early application GPIO access without waiting for userspace module loading.
+CONFIG_RASPBERRYPI_GPIOMEM=y
+CONFIG_GPIO_CDEV=y
+
 # Load Wi-Fi after the root filesystem (including firmware) is available.
 CONFIG_WLAN=y
 CONFIG_CFG80211=m

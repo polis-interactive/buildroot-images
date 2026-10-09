@@ -6,6 +6,6 @@ tmpfs		/dev/shm	tmpfs	mode=1777	0	0
 tmpfs		/tmp		tmpfs	mode=1777	0	0
 tmpfs		/run		tmpfs	mode=0755,nosuid,nodev	0	0
 sysfs		/sys		sysfs	defaults	0	0
-# Mounted by mount-data before any services, including the random seed service.
+# Mounted before rcS services; the stateless GPIO boot test can run earlier.
 /dev/mmcblk0p3	/data		ext4	rw,noatime,noauto	0	0
 /data/var-lib	/var/lib	none	bind,noauto	0	0

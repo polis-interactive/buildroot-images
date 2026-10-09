@@ -6,19 +6,19 @@ with a microSD card. `polis_rpi4` preserves the first glibc-based configuration;
 Both derive from that release's `raspberrypi4_64_defconfig`. Three additional
 musl profiles compare EROFS, SquashFS, and initramfs against the existing ext4 image.
 `rpi4_stock` provides the upstream 64-bit Pi 4 configuration with a common
-boot-timing probe as the stock Buildroot baseline.
+boot-timing probe and the early GPIO blink test as the stock Buildroot baseline.
 
 ## Stock Raspberry Pi 4
 
 `configs/rpi4_stock_defconfig` follows Buildroot **2026.08**'s
-`configs/raspberrypi4_64_defconfig`, adding only the common post-build timing
-probe installer. It uses the upstream glibc toolchain,
+`configs/raspberrypi4_64_defconfig`, adding the common post-build timing
+probe, `polis-gpio-test`, and a small kernel fragment for built-in GPIO access.
+It uses the upstream glibc toolchain,
 `bcm2711` kernel configuration, firmware settings, writable ext4 root,
 Ethernet DHCP, and serial/HDMI consoles. This is a minimal Buildroot image;
 Raspberry Pi OS and its desktop are not included.
 
 ```sh
-make configure ARGS="--board rpi4_stock"
 make build ARGS="--board rpi4_stock"
 ```
 
@@ -49,10 +49,130 @@ describe the `polis_*` profiles.
 - A kernel fragment disables Ethernet, USB, Bluetooth, graphics/framebuffer,
   virtual terminals, audio, and media support. A BusyBox fragment removes cron.
 
-The test application is not included yet. There is no interactive management
-connection in this profile. Images never require Wi-Fi credentials at build
+The early GPIO test described below is included; the full application is not.
+There is no interactive management connection in this profile. Images never require Wi-Fi credentials at build
 time; provisioning will happen on the device through our forthcoming fork of
 `balena-os/wifi-connect`.
+
+## Early GPIO test
+
+All `polis_*` profiles and `rpi4_stock` include `polis-gpio-test`, a standalone Rust
+probe based on RPPAL's [blink example](https://github.com/golemparts/rppal/blob/master/examples/gpio_blinkled.rs).
+Both LEDs start low and toggle every 500 ms after their own milestone:
+
+| Indicator | BCM GPIO | Physical pin | First high edge |
+| --- | --- | --- | --- |
+| UART available | 26 | 37 | After `/dev/ttyAMA0` opens successfully |
+| Boot logs saved | 19 | 35 | After the boot capture is written and flushed to persistent `/data` |
+
+Connect each LED through its own suitable series resistor to its GPIO and ground
+(for example, physical pin 39). These are test pin selections, not Slate BSP pin
+assignments. The stock profile retains its serial/HDMI consoles and upstream
+UART routing; the probe only opens and closes UART without sending data.
+
+BusyBox init launches the test immediately after `mount -a`, with `/proc`, `/sys`,
+`/dev`, and writable `/run` available, before persistent `/data` setup and rcS
+services. Built-in GPIO access lets the UART indicator start without Wi-Fi,
+D-Bus, module loading, or persistent storage. Starting the probe is an exception
+to the storage guard; normal services and log export still require storage.
+
+The test waits up to **5 seconds** for `/dev/ttyAMA0` to open read/write as a
+character device, retrying missing/not-ready devices every 10 ms. It closes the
+UART without reading, writing, or changing its settings. This establishes device
+availability, not wiring, baud-rate configuration, or communication with a peer.
+Permission errors fail immediately. On failure the UART LED stays low, but the
+error is still exported and the saved-log LED can light independently. The process
+runs as root; SIGTERM/SIGINT restore both pins once signal handlers are installed.
+
+`POLIS_GPIO_START` records software startup before Tokio initialization; there is
+no startup LED edge. `POLIS_GPIO_READY` follows the UART edge. Both include kernel
+uptime in `/run/polis-gpio-test.log`. The ready line also reports `uart_wait_ms`
+(the open/retry phase) and `startup_to_uart_ms` (time from the software startup
+checkpoint through runtime setup and startup logging to just after the UART
+edge). These are approximate software timings, not exact GPIO timestamps.
+Kernel uptime excludes firmware startup. The launcher returns immediately,
+so neither UART waiting nor log export stalls init. An `init` smoke pass does not
+prove GPIO success; physical timing still requires a real Pi.
+
+After UART succeeds or fails, a separate worker checks every second for an actual
+writable, block-backed ext4 mount at `/data`. An existing directory alone never
+counts as persistent storage. It exports one capture per kernel boot ID to
+`/data/boot-diagnostics/<boot-id>/`:
+
+- `gpio.log`: program-start uptime plus UART readiness/timing or error.
+- `dmesg.log`: kernel ring-buffer snapshot, read without clearing it. If dmesg
+  fails, `dmesg-error.txt` records the error and the other files are still saved.
+- `cmdline.txt`, `mountinfo.txt`, `uptime.txt`, and `kernel-version.txt`: boot
+  configuration and capture context.
+- `firmware.log`: retained VideoCore messages from Raspberry Pi's `vclog --msg`.
+- `bootloader-config.txt`, `bootloader-version.txt`, `firmware-version.txt`, and
+  `firmware-config-{int,str}.txt`: read-only `vcgencmd` queries for EEPROM boot
+  order/version and effective firmware configuration. Each failed firmware query
+  produces a corresponding `*-error.txt` instead; other captures still complete.
+
+Files and directories are synchronized before success is reported; BCM19 then
+starts blinking within approximately 50 ms. Capture work starts after the UART
+marker and performs no blocking storage I/O on the LED event loop. Incomplete
+captures remain in hidden `.<boot-id>.pending` directories. Failed exports retry
+every second and keep BCM19 off. Each boot's first completed capture is preserved
+across probe restarts; later boots use separate directories. This is a one-time
+snapshot, not continuous logging or a complete service-startup transcript.
+Captures are retained until manually removed.
+
+The probe selects `polis-firmware-tools`, which builds only `vclog` and `vcgencmd`
+from a pinned, hash-checked [raspberrypi/utils](https://github.com/raspberrypi/utils)
+revision. Both link statically on musl. The current Polis kernel already provides
+the mailbox and memory access these utilities use; no kernel changes are needed.
+Firmware queries run in the export worker after the UART-ready edge. The GPIO19
+saved-log indicator now also waits for these additional captures to be flushed.
+
+Retained firmware messages are available with the current standard `start4.elf`
+without enabling UART trace. The earliest EEPROM bootloader UART transcript is
+not guaranteed to be present in this buffer. Keep standard firmware during this
+investigation: `gpu_mem=16` selects cut-down firmware, which removes debug logging.
+See the [firmware options](https://www.raspberrypi.com/documentation/computers/config_txt.html).
+
+For a later diagnostic boot, `dtdebug=1` in the boot partition's `config.txt` adds
+device-tree/overlay details to the firmware log. Leave it off for the initial
+capture; verbose tracing can affect timing and fill the retained buffer. Full
+serial tracing uses EEPROM `BOOT_UART=1` for early bootloader output and
+`uart_2ndstage=1` in `config.txt` for firmware output, captured externally with a
+3.3 V UART adapter. Those settings send traffic on the application UART and are
+not enabled by this exporter. It does not write the EEPROM. See Raspberry Pi's
+[boot tracing documentation](https://www.raspberrypi.com/documentation/computers/config_txt.html#uart_2ndstage)
+and [device-tree debugging](https://www.raspberrypi.com/documentation/computers/configuration.html#debugging).
+
+Wait for BCM19 to blink before powering off to retrieve the SD card. Open the
+`polis-data` partition's `boot-diagnostics` directory on the host, then read
+`gpio.log` and `dmesg.log` inside the boot's folder. `/run/polis-gpio-test.log`
+itself remains volatile. The stock and original glibc profiles have no `/data`
+mount, so they retain RAM logging and BCM19 remains off.
+
+For the next experiment, compare saved program-start uptime against measured
+power-on-to-UART-LED time to approximately separate pre-kernel loading from Linux
+startup. Inspect `uart_wait_ms` to quantify UART retries. BCM19 now measures export
+completion, not early application startup. Neither LED tests UART traffic.
+
+Sources and locked dependencies live under `package/polis-gpio-test/app/`.
+The test uses the same RPPAL 0.22.1 and Tokio 1.x family as
+`~/Polis/1017-Slate/SlateCode/bsp/pi-controller`, without importing the BSP or
+its RS-485/application code. Buildroot installs only the executable on the Pi.
+Musl profiles explicitly link it statically and verify the resulting ELF.
+For this local Cargo package, the configure step fetches locked dependencies;
+compilation is offline. An uncached first build needs network access.
+
+Run `make build` and select the board after editing Rust sources, firmware
+configuration, or kernel fragments. Content hashes select the affected steps,
+including with `--no-configure`. An unchanged probe is skipped. A changed probe
+is re-extracted and rebuilt so removed or renamed source files cannot survive
+Buildroot's local-source copy; downloaded Cargo dependencies remain cached.
+Firmware config, command-line, and extra-file changes trigger firmware
+installation and image assembly. No separate package refresh commands are needed.
+On a device with a shell, inspect `cat /run/polis-gpio-test.log`; stop with
+`/etc/init.d/polis-gpio-test stop`. A manual invocation accepts
+`polis-gpio-test [UART_GPIO [UART_PATH [EXPORT_GPIO]]]`, defaulting to
+`26 /dev/ttyAMA0 19`. The original first two arguments retain their meanings;
+the two GPIOs must be distinct and cannot use UART pins 14/15.
 
 ## Wi-Fi provisioning (pending)
 
@@ -154,8 +274,9 @@ make build
 make build ARGS="--board polis_rpi4_musl"
 ```
 
-`build` selects the board once, reloads its saved defconfig, builds the image,
-and saves a read-only snapshot under `snapshots/<board>-YYYYMMDD/`, using the
+`build` selects the board once, compares content hashes, runs the affected
+configuration/package/image steps, and saves a read-only snapshot under
+`snapshots/<board>-YYYYMMDD/`, using the
 America/Chicago calendar day. Additional snapshots for that board and day use
 `-2`, `-3`, etc., without overwriting existing captures.
 Fresh output directories are configured automatically. Each step must succeed
@@ -174,19 +295,64 @@ Boards are discovered from `configs/*_defconfig`. Every board uses
 Keep build directories at their original paths: generated host tools embed
 absolute paths, so moving a build directory requires a fresh build.
 
-The default build flow reloads the saved defconfig.
-Save menuconfig changes with `savedefconfig` before using the default flow.
+The default build flow applies the saved defconfig when its inputs or the
+generated `.config` differ from the last successful build. Save menuconfig
+changes with `savedefconfig` before using the default flow.
 
-If an existing musl build reports `usr/bin/xz still needs dynamic linking`,
-clean and rebuild XZ after updating the linking policy. Buildroot's package
-stamps do not track changes to linker options:
+### Incremental build rules
 
-```sh
-make -C output/polis_rpi4_musl xz-dirclean
-make build ARGS="--board polis_rpi4_musl"
+`build.toml` declares the configuration, image, kernel, BusyBox, and firmware
+rules. `package/*/build.toml` files declare package-specific rules; Python does
+not contain a package refresh list. The linking-policy rules cover XZ, kmod,
+D-Bus, and iwd, including their declared dependencies.
+
+Each output directory stores SHA-256 input and output hashes in
+`.build-state.json`. A step is skipped only when its declared inputs, selected
+config values, dependencies, rule, and outputs match. File additions, deletions,
+permissions, and contents count; modification times do not. Generated Cargo
+`target` directories and Python caches are excluded by the root policy.
+
+The first build without this state conservatively refreshes all enabled rules,
+including a kernel rebuild, to establish a verified baseline. Later builds
+skip unchanged work. Kernel/BusyBox fragment changes reconfigure those
+components; recipe or source-version changes reset their source directories.
+Firmware text edits only reinstall firmware and assemble the image. Overlay
+and image-script edits only assemble the image. Every successful invocation
+still saves a snapshot, even when all build steps were skipped; hashing and
+snapshot copying therefore still take time.
+
+To track another component, add a rule to a discovered package manifest:
+
+```toml
+[[steps]]
+name = "my-app"
+when = "BR2_PACKAGE_MY_APP"
+targets = ["my-app-dirclean", "my-app"]
+inputs = ["package/my-app"]
+config = ["BR2_PACKAGE_MY_APP*"]
+outputs = ["{output}/build/my-app-*/.stamp_built", "{output}/target/usr/bin/my-app"]
 ```
 
-Use the matching output directory and board name for other musl profiles.
+Paths/globs are repository-relative unless absolute. Placeholders are `{repo}`,
+`{buildroot}`, `{board}`, and `{output}`. `config` selects effective Buildroot
+symbols using globs. `config_paths` names symbols whose values contain input
+paths; those paths follow Buildroot's relative-path convention and expand Make
+variables declared in `[variables]`, such as `$(BR2_EXTERNAL_POLIS_PATH)`.
+`depends_on = ["another-rule"]` orders rules and propagates changes. Targets run
+sequentially, including under parallel Make. Outputs are checked and recorded
+after final image assembly, when stripping and post-build hooks are finished.
+
+Rules describe which steps need rebuilding; the package recipes and board
+configs continue to define compiler flags and feature choices. New packages
+or external input locations need corresponding declarations. This is not
+automatic dependency discovery for every upstream Buildroot package.
+
+The wrapper locks each output directory, invalidates old state before changing
+artifacts, and commits new state only after successful, stable build inputs.
+Failed builds are retried, and editing inputs during a build requires another
+`make build`. Manual configure/reconfigure actions invalidate this state.
+Buildroot's existing limits still apply: use fresh output directories for
+toolchain/libc changes or package removals.
 
 Pass CLI options through `ARGS`, for example:
 
@@ -544,11 +710,17 @@ make devices
 make flash
 ```
 
-Image discovery searches `output/<board>/` for boards in `configs/`,
+`make images` searches `output/<board>/` for boards in `configs/`,
 completed snapshots (using the same checks as `smoke`), and an optional explicit
 `--output` directory. It does not scan Buildroot's output or unrecognized output
 directories. Empty images and incomplete captures are excluded. Duplicate paths are
-listed once. `flash` lists images and whole disks for explicit selection, then
+listed once. `make flash` only lists completed snapshots from `snapshots/`
+(or `--snapshots PATH`); it does not search build outputs or accept `--output`.
+An explicit `--image` path is still supported. The `flash` disk display and picker
+only include removable whole disks, such as SD cards in USB or built-in readers;
+USB sticks can also appear. Internal NVMe/SATA disks are excluded from the picker.
+`make devices` still lists all disks, and `--device` accepts an explicit path.
+`flash` requires explicit image and device selection, then
 requires typing the destination device path to confirm erasing it. It rejects
 partitions, read-only disks, mounted descendants/active swap, and undersized
 media. It rechecks the destination and source after confirmation and any sudo
@@ -596,7 +768,8 @@ make menuconfig ARGS="--board polis_rpi4_musl"
 make savedefconfig ARGS="--board polis_rpi4_musl"
 ```
 
-`configure` and the default `build` flow reload the saved defconfig and replace
+`configure` reloads the saved defconfig. The default `build` flow does so when
+configuration inputs or the generated `.config` have changed, replacing
 unsaved menuconfig changes. Use `build --no-configure` through `ARGS` to retain
 those changes for one build, or save them first.
 `make savedefconfig ARGS="--board polis_rpi4_musl"` writes back to `configs/<board>_defconfig`. Commands
@@ -611,13 +784,11 @@ that use an existing configuration check that it matches the selected board.
 - `package/`: add test software recipes here, with a `source` entry in
   `package/Config.in`. `external.mk` includes `package/*/*.mk` automatically.
 
-After changing the kernel or BusyBox fragments in an existing build, use the
-corresponding Make target to reconfigure that component:
+After changing kernel or BusyBox fragments, run the normal build. The declared
+rules reconfigure the changed component automatically:
 
 ```sh
-make linux-reconfigure ARGS="--board polis_rpi4_musl"
-make busybox-reconfigure ARGS="--board polis_rpi4_musl"
-make build ARGS="--board polis_rpi4_musl"
+make build
 ```
 
 Use a fresh output directory after removing packages to avoid stale files in
@@ -642,3 +813,35 @@ Keep kernel logging available in memory for diagnosis. Measure power-on to
 test readiness (and separately Wi-Fi readiness) before trimming more drivers
 or changing firmware settings. Kernel config validation alone does not verify
 hardware boot, Wi-Fi association, or UART traffic.
+
+### TODO Linux boot delay investigation
+
+Deferred follow-up to the firmware/bootloader investigation. The EROFS hardware
+capture `803b957b-aae1-45ad-a97c-fd4b9cd1b40a` on 2026-10-09 reached UART-ready
+at Linux uptime **0.88 s**, with **0.187 ms** spent opening UART. Init started at
+**0.838 s**. These tasks target the measured Linux portion; they do not explain
+the roughly 7.5 s before Linux's timed startup inferred from the 8.4 s power-on
+measurement, assuming comparable boots.
+
+- [ ] **Test disabling PCIe first.** The current kernel still enables
+  `CONFIG_PCI` and `CONFIG_PCIE_BRCMSTB` despite USB support being disabled.
+  PCIe enumeration spans approximately **0.504–0.616 s** in the captured log.
+  Confirm that the required microSD, SDIO Wi-Fi, UART, and GPIO paths have no
+  PCIe dependency, then test `# CONFIG_PCI is not set` in
+  `board/polis/rpi4/linux.fragment`. Inspect the generated kernel configuration
+  and verify hardware boot, persistent storage, Wi-Fi, GPIO, and UART traffic.
+  Treat the observed ~111 ms interval as a candidate, not a guaranteed saving.
+- [ ] **Explain the ~438 ms silent interval.** The log jumps from a clocksource
+  switch at **0.047279 s** to disk-quota initialization at **0.485108 s**.
+  Capture `initcall_debug` timings with sufficient kernel log buffer space;
+  do not attribute the whole gap to either adjacent message. Remove diagnostic
+  tracing for final timing comparisons.
+- [ ] **Audit remaining unused built-in subsystems.** The log still shows KVM,
+  NFS/RPC, SCSI/iSCSI, and input support. Check application and kernel
+  dependencies before disabling each candidate. Record kernel image size as
+  well as boot timing, since smaller images may also reduce loading time.
+- [ ] **Validate each change independently.** Keep firmware, filesystem,
+  microSD card, and measurement method fixed. Compare five cold boots per
+  variant using power-on-to-UART-LED and the saved kernel/application timings;
+  record the median and range with the snapshot name. Keep changes only after
+  the required hardware functions pass and measured results justify them.

@@ -94,7 +94,7 @@ def snapshot(ctx: Context, source: Path, name: str) -> Path:
     if defconfig and Path(defconfig).is_file():
         shutil.copy2(defconfig, configs / "saved_defconfig")
     shutil.copy2(ctx.buildroot / "Makefile", configs / "buildroot-Makefile")
-    members = ("Makefile", "pyproject.toml", "uv.lock", ".python-version",
+    members = ("Makefile", "build.toml", "pyproject.toml", "uv.lock", ".python-version",
                "src", "Config.in", "external.desc", "external.mk",
                "configs", "board", "package", "patches", "README.md")
     def archive_filter(info):

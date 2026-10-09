@@ -22,6 +22,27 @@ class ToolsTest(unittest.TestCase):
         (self.repo / 'configs').mkdir(parents=True)
         self.br.mkdir()
         (self.br / 'Makefile').write_text('export BR2_VERSION := test\n')
+        (self.repo / 'build.toml').write_text('''schema = 1
+[configure]
+targets = ["{board}_defconfig"]
+inputs = ["configs/{board}_defconfig"]
+outputs = ["{output}/.config"]
+[image]
+targets = ["all"]
+config = ["*"]
+outputs = ["{output}/images/sdcard.img"]
+[[steps]]
+name = "probe"
+when = "BR2_PACKAGE_POLIS_GPIO_TEST"
+targets = ["polis-gpio-test-reconfigure"]
+outputs = ["{output}/images/sdcard.img"]
+[[steps]]
+name = "firmware"
+when = "BR2_PACKAGE_RPI_FIRMWARE"
+targets = ["rpi-firmware-reinstall"]
+inputs = ["firmware inputs"]
+outputs = ["{output}/images/rpi-firmware"]
+''')
         for board in ('polis_rpi4', 'polis_rpi4_musl', 'other'):
             (self.repo / 'configs' / f'{board}_defconfig').write_text('')
         self.ctx = Context(self.repo, self.br, self.br / 'dl', self.repo / 'snapshots')
@@ -113,7 +134,7 @@ class ToolsTest(unittest.TestCase):
             self.assertIn(f'BR2_DL_DIR={self.root}/downloads', command)
             steps.append(command[-1])
             if command[-1] == 'polis_rpi4_musl_defconfig':
-                output.mkdir()
+                output.mkdir(exist_ok=True)
                 (output / '.config').write_text(
                     f'BR2_DEFCONFIG="{self.repo}/configs/polis_rpi4_musl_defconfig"\n')
             else:
@@ -188,6 +209,120 @@ class ToolsTest(unittest.TestCase):
                     builds.build(self.ctx, 'build', 'polis_rpi4_musl', None, name=name)
                 run.assert_not_called()
 
+    def test_build_refreshes_enabled_local_package_before_image_and_snapshot(self):
+        output = self.root / 'custom output'
+        steps = []
+
+        def run_build(command):
+            self.assertIn(f'O={output}', command)
+            self.assertIn(f'BR2_DL_DIR={self.ctx.downloads}', command)
+            steps.append(command[-1])
+            if command[-1] == 'polis_rpi4_musl_defconfig':
+                output.mkdir(exist_ok=True)
+                (output / '.config').write_text(
+                    f'BR2_DEFCONFIG="{self.repo}/configs/polis_rpi4_musl_defconfig"\n'
+                    'BR2_PACKAGE_POLIS_GPIO_TEST=y\n')
+            elif command[-1] == 'all':
+                self.image(output)
+
+        with patch.object(builds, 'run', side_effect=run_build):
+            builds.build(self.ctx, 'build', 'polis_rpi4_musl', output, name='refreshed')
+        self.assertEqual(steps, ['polis_rpi4_musl_defconfig', 'polis-gpio-test-reconfigure', 'all'])
+        self.assertTrue((self.ctx.snapshots / 'refreshed/images/sdcard.img').is_file())
+
+    def test_no_configure_skips_unchanged_local_package_on_second_build(self):
+        output = self.output()
+        self.image(output)
+        config = output / '.config'
+        config.write_text(config.read_text() + 'BR2_PACKAGE_POLIS_GPIO_TEST=y\n')
+        original = config.read_bytes()
+        with patch.object(builds, 'run') as run, patch.object(snapshots, 'snapshot'):
+            for _ in range(2):
+                builds.build(self.ctx, 'build', 'polis_rpi4_musl', None, configure=False)
+        self.assertEqual([call.args[0][-1] for call in run.call_args_list],
+                         ['polis-gpio-test-reconfigure', 'all'])
+        self.assertEqual(config.read_bytes(), original)
+
+    def test_plain_build_picks_up_changed_firmware_files_before_image(self):
+        output = self.root / 'custom output'
+        firmware = self.repo / 'firmware inputs'
+        firmware.mkdir()
+        source = firmware / 'config.txt'
+        cmdline = firmware / 'cmdline.txt'
+        source.write_text('force_eeprom_read=1\n')
+        cmdline.write_text('rootfstype=erofs\n')
+        staged = output / 'images/rpi-firmware'
+        steps = []
+
+        def run_build(command):
+            self.assertIn(f'O={output}', command)
+            self.assertIn(f'BR2_DL_DIR={self.ctx.downloads}', command)
+            steps.append(command[-1])
+            if command[-1] == 'polis_rpi4_musl_defconfig':
+                output.mkdir(parents=True, exist_ok=True)
+                (output / '.config').write_text(
+                    f'BR2_DEFCONFIG="{self.repo}/configs/polis_rpi4_musl_defconfig"\n'
+                    'BR2_PACKAGE_POLIS_GPIO_TEST=y\nBR2_PACKAGE_RPI_FIRMWARE=y\n')
+            elif command[-1] == 'rpi-firmware-reinstall':
+                staged.mkdir(parents=True, exist_ok=True)
+                (staged / 'config.txt').write_bytes(source.read_bytes())
+                (staged / 'cmdline.txt').write_bytes(cmdline.read_bytes())
+            elif command[-1] == 'all':
+                # Assemble from staged files, just as genimage does.
+                self.image(output).write_bytes((staged / 'config.txt').read_bytes()
+                                               + (staged / 'cmdline.txt').read_bytes())
+
+        with patch.object(builds, 'run', side_effect=run_build):
+            builds.build(self.ctx, 'build', 'polis_rpi4_musl', output, name='before')
+            source.write_text('force_eeprom_read=0\ndisable_poe_fan=1\n')
+            cmdline.write_text('rootfstype=erofs ro console=null\n')
+            builds.build(self.ctx, 'build', 'polis_rpi4_musl', output, name='after')
+        self.assertEqual(steps, ['polis_rpi4_musl_defconfig', 'polis-gpio-test-reconfigure',
+                                 'rpi-firmware-reinstall', 'all',
+                                 'rpi-firmware-reinstall', 'all'])
+        self.assertEqual((self.ctx.snapshots / 'after/images/sdcard.img').read_bytes(),
+                         source.read_bytes() + cmdline.read_bytes())
+        self.assertEqual((self.ctx.snapshots / 'before/images/sdcard.img').read_bytes(),
+                         b'force_eeprom_read=1\nrootfstype=erofs\n')
+
+    def test_no_configure_refreshes_firmware_but_preserves_configuration(self):
+        output = self.output()
+        self.image(output)
+        config = output / '.config'
+        config.write_text(config.read_text() + 'BR2_PACKAGE_RPI_FIRMWARE=y\n')
+        original = config.read_bytes()
+        with patch.object(builds, 'run') as run, patch.object(snapshots, 'snapshot'):
+            builds.build(self.ctx, 'build', 'polis_rpi4_musl', None, configure=False)
+        self.assertEqual([call.args[0][-1] for call in run.call_args_list],
+                         ['rpi-firmware-reinstall', 'all'])
+        self.assertEqual(config.read_bytes(), original)
+
+    def test_firmware_refresh_failure_prevents_image_and_snapshot(self):
+        output = self.output()
+        self.image(output)
+        config = output / '.config'
+        config.write_text(config.read_text() + 'BR2_PACKAGE_RPI_FIRMWARE=y\n')
+        with patch.object(builds, 'run', side_effect=subprocess.CalledProcessError(2, 'make')) as run, \
+                patch.object(snapshots, 'snapshot') as capture:
+            with self.assertRaises(subprocess.CalledProcessError):
+                builds.build(self.ctx, 'build', 'polis_rpi4_musl', None, configure=False)
+        self.assertEqual(run.call_args.args[0][-1], 'rpi-firmware-reinstall')
+        run.assert_called_once()
+        capture.assert_not_called()
+
+    def test_local_package_failure_prevents_image_and_snapshot(self):
+        output = self.output()
+        self.image(output)
+        config = output / '.config'
+        config.write_text(config.read_text() + 'BR2_PACKAGE_POLIS_GPIO_TEST=y\n')
+        with patch.object(builds, 'run', side_effect=subprocess.CalledProcessError(2, 'make')) as run, \
+                patch.object(snapshots, 'snapshot') as capture:
+            with self.assertRaises(subprocess.CalledProcessError):
+                builds.build(self.ctx, 'build', 'polis_rpi4_musl', None, configure=False)
+        self.assertEqual(run.call_args.args[0][-1], 'polis-gpio-test-reconfigure')
+        run.assert_called_once()
+        capture.assert_not_called()
+
     def test_build_cancellation_never_configures_or_snapshots(self):
         with patch.object(cli, 'REPO', self.repo), patch.object(cli, 'choose', return_value=None), \
                 patch.object(builds, 'run') as run, patch.object(snapshots, 'snapshot') as capture:
@@ -242,6 +377,62 @@ class ToolsTest(unittest.TestCase):
             with self.assertRaises(UserError):
                 images.flash(self.ctx, self.image(self.output()), Path('/dev/test'))
             run.assert_not_called()
+
+    def test_flash_picker_only_offers_completed_snapshots(self):
+        image = self.image(self.output())
+        saved = snapshots.snapshot(self.ctx, image.parent.parent, 'complete')
+        self.image(self.ctx.snapshots / 'incomplete')
+        (self.ctx.snapshots / 'incomplete/.incomplete').touch()
+        self.image(self.ctx.snapshots / 'bare-image')
+        with patch.object(images, 'choose', return_value=None) as choose, \
+                patch.object(images, 'run') as run:
+            images.flash(self.ctx, None, None)
+        choose.assert_called_once_with([saved / 'images/sdcard.img'], 'Image')
+        run.assert_not_called()
+
+    def test_flash_without_snapshots_does_not_fall_back_to_output(self):
+        self.image(self.output())
+        with patch.object(images, 'choose', return_value=None) as choose, \
+                patch.object(images, 'run') as run:
+            images.flash(self.ctx, None, None)
+        choose.assert_called_once_with([], 'Image')
+        run.assert_not_called()
+
+    def test_flash_rejects_output_option(self):
+        with contextlib.redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+            cli.parser().parse_args(['flash', '--output', str(self.output())])
+
+    def test_flash_only_displays_and_offers_removable_whole_disks(self):
+        image = self.image(self.output())
+        card = dict(self.disk(rm=True), name='/dev/sda', tran='usb',
+                    children=[dict(name='/dev/sda1', type='part', rm=True,
+                                   mountpoints=['/run/media/bootfs'])])
+        internal = dict(self.disk(rm=False), name='/dev/nvme0n1', tran='nvme')
+        fixed_usb = dict(self.disk(rm=False), name='/dev/sdb', tran='usb')
+        partition = dict(self.disk(rm=True), name='/dev/sdc1', type='part')
+        native_card = dict(self.disk(rm=True), name='/dev/mmcblk0', tran='mmc')
+        with patch('sys.stdin.isatty', return_value=True), \
+                patch.object(images, 'disks', return_value=[card, internal, fixed_usb, partition,
+                                                          native_card, self.disk()]), \
+                patch.object(images, 'show_disks') as show, \
+                patch.object(images, 'choose', return_value=None) as choose, \
+                patch.object(images, 'run') as run:
+            images.flash(self.ctx, image, None)
+        show.assert_called_once_with([card, native_card])
+        choose.assert_called_once_with(['/dev/sda', '/dev/mmcblk0'], 'Device')
+        run.assert_not_called()
+
+    def test_flash_without_removable_disks_offers_no_destination(self):
+        image = self.image(self.output())
+        with patch('sys.stdin.isatty', return_value=True), \
+                patch.object(images, 'disks', return_value=[self.disk(rm=False)]), \
+                patch.object(images, 'show_disks') as show, \
+                patch.object(images, 'choose', return_value=None) as choose, \
+                patch.object(images, 'run') as run:
+            images.flash(self.ctx, image, None)
+        show.assert_called_once_with([])
+        choose.assert_called_once_with([], 'Device')
+        run.assert_not_called()
 
     def flash_setup(self):
         image = self.image(self.output())

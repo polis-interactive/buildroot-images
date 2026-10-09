@@ -13,7 +13,11 @@ PROGRAMS = (
 
 def main():
     target = Path(sys.argv[1])
-    for program in PROGRAMS:
+    programs = list(PROGRAMS)
+    for optional in ("usr/bin/polis-gpio-test", "usr/bin/vclog", "usr/bin/vcgencmd"):
+        if (target / optional).is_file():
+            programs.append(optional)
+    for program in programs:
         path = target / program
         if not path.is_file():
             raise RuntimeError(f"missing {program}")
