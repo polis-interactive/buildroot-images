@@ -1,0 +1,3 @@
+# Static PID 1, shell, and BusyBox utilities without disabling shared libraries
+# globally (BlueZ and future applications can still use dynamic linking).
+CONFIG_STATIC=y

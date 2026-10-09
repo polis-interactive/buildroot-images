@@ -1,0 +1,5 @@
+# Shared persistent ext4 data and volatile runtime mounts for all musl images.
+CONFIG_EXT4_FS=y
+CONFIG_TMPFS=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y

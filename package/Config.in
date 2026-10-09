@@ -1,1 +1,10 @@
 # Add source statements for custom package Config.in files here.
+
+config BR2_POLIS_PREFER_STATIC
+	bool "Prefer static executables in the Polis image"
+	depends on BR2_TOOLCHAIN_USES_MUSL
+	depends on BR2_SHARED_STATIC_LIBS
+	help
+	  Link the core boot executables statically while retaining
+	  shared-library support for packages such as BlueZ. Requires
+	  the Polis musl board's patches and BusyBox config fragment.

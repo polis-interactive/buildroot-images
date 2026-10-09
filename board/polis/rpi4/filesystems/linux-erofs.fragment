@@ -1,0 +1,3 @@
+# The root filesystem and its decompressor must be built in.
+CONFIG_EROFS_FS=y
+CONFIG_EROFS_FS_ZIP=y

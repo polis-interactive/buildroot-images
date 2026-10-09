@@ -1,0 +1,31 @@
+Subject: [PATCH] meson: optionally link kmod tools statically
+
+Keep the shared libkmod target available. Only the target executable uses
+-static when explicitly requested, so host-kmod keeps its normal linking.
+Combine with prefer_static=true and dlopen=[] to link compression directly.
+
+Upstream-Status: Inappropriate [Polis linking policy]
+
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -112,3 +112,10 @@
+   value : false,
+   description : 'Build the documentation. Default: false',
+ )
++
++option(
++  'static-tools',
++  type : 'boolean',
++  value : false,
++  description : 'Link the kmod executable statically',
++)
+--- a/meson.build
++++ b/meson.build
+@@ -468,6 +468,7 @@
+ kmod = executable(
+   'kmod',
+   kmod_sources,
++  link_args : get_option('static-tools') ? ['-static'] : [],
+   link_with : [libshared, libkmod_internal],
+   gnu_symbol_visibility : 'hidden',
+   build_by_default : get_option('tools'),

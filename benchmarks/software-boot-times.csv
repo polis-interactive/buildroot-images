@@ -1,0 +1,12 @@
+source,target,passed,median_s,min_s,max_s,results
+snapshots/rpi4_stock-20261008,buildroot login:,3/3,25.145,24.244,25.246,.cache/smoke/20261009T025400.641276Z
+snapshots/polis_rpi4-init-finished-20261008,init,3/3,12.845,12.298,14.129,.cache/smoke/20261009T030425.210919Z
+snapshots/polis_rpi4_musl-init-finished-20261008,init,3/3,9.942,9.624,10.600,.cache/smoke/20261009T030505.297781Z
+snapshots/polis_rpi4_musl_squashfs-20261008,init,3/3,9.863,9.659,9.920,.cache/smoke/20261009T033527.585422Z
+snapshots/polis_rpi4_musl_erofs-init-finished-20261008,init,3/3,9.683,9.668,9.726,.cache/smoke/20261009T030536.650579Z
+snapshots/polis_rpi4_musl_initramfs-20261008,init,3/3,4.555,4.406,4.600,.cache/smoke/20261009T041243.790838Z
+snapshots/polis_rpi4-init-finished-20261008,services,1/1,14.032,14.032,14.032,.cache/smoke/20261009T030607.036235Z
+snapshots/polis_rpi4_musl_squashfs-20261008,services,3/3,13.058,12.643,13.520,.cache/smoke/20261009T033838.668675Z
+snapshots/polis_rpi4_musl-init-finished-20261008,services,1/1,12.471,12.471,12.471,.cache/smoke/20261009T030621.531978Z
+snapshots/polis_rpi4_musl_erofs-init-finished-20261008,services,1/1,12.082,12.082,12.082,.cache/smoke/20261009T030634.704163Z
+snapshots/polis_rpi4_musl_initramfs-20261008,services,3/3,5.344,5.218,5.426,.cache/smoke/20261009T041309.172462Z

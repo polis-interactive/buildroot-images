@@ -1,0 +1,1 @@
+rdinit=/init ro console=null
