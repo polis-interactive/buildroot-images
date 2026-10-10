@@ -12,9 +12,12 @@ dtparam=audio=off
 force_eeprom_read=0
 disable_poe_fan=1
 
-# Free PL011 UART0 for the test on GPIO14/15, not a login console.
+# Route PL011 boot diagnostics to the Pico on GPIO14/15.
 dtoverlay=disable-bt
 enable_uart=1
+
+# Direct laptop -> Pi USB-C diagnostic serial device.
+dtoverlay=dwc2,dr_mode=peripheral
 
 # Load the complete LZ4-compressed root filesystem from the boot partition.
 initramfs rootfs.cpio.lz4 followkernel

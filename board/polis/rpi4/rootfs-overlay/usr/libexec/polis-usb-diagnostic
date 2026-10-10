@@ -1,0 +1,54 @@
+#!/bin/sh
+# BusyBox init respawns this independently of rcS. USB open/write may block
+# until a host connects; neither operation belongs in the boot-critical path.
+sleep 1
+# g_serial has no set_termios callback: the kernel preserves hardware baud
+# settings. Asking stty for 115200 makes its readback check fail. USB needs
+# only the software line discipline configured; physical UART is separate.
+stty -F /dev/ttyGS0 raw -echo || exit 1
+exec 3<>/dev/ttyGS0 || exit 1
+printf 'POLIS_USB_READY\n' >&3 || exit 1
+while IFS= read -r request <&3; do
+    case "$request" in
+        POLIS_PING)
+            read -r uptime idle </proc/uptime
+            read -r boot_id </proc/sys/kernel/random/boot_id
+            printf 'POLIS_USB_OK uptime=%s boot_id=%s\n' "$uptime" "$boot_id" >&3 || exit 1
+            ;;
+        POLIS_CAPTURE\ *)
+            nonce=${request#POLIS_CAPTURE }
+            case "$nonce" in *[!0-9a-f]*|'') continue ;; esac
+            [ "${#nonce}" -eq 32 ] || continue
+            read -r boot_id </proc/sys/kernel/random/boot_id
+            directory=/data/boot-diagnostics/$boot_id
+            if [ ! -f "$directory/gpio.log" ] || [ -L "$directory" ]; then
+                printf 'POLIS_CAPTURE_BUSY %s\n' "$nonce" >&3 || exit 1
+                continue
+            fi
+            # Fixed server-side whitelist: no client-selected path or shell.
+            names='gpio.log cmdline.txt mountinfo.txt uptime.txt kernel-version.txt
+                dmesg.log dmesg-error.txt firmware.log firmware-error.txt
+                firmware-version.txt firmware-version-error.txt
+                bootloader-config.txt bootloader-config-error.txt
+                bootloader-version.txt bootloader-version-error.txt
+                firmware-config-int.txt firmware-config-int-error.txt
+                firmware-config-str.txt firmware-config-str-error.txt'
+            printf 'POLIS_CAPTURE_BEGIN %s %s\n' "$nonce" "$boot_id" >&3 || exit 1
+            total=0
+            for name in $names; do
+                file=$directory/$name
+                [ -f "$file" ] && [ ! -L "$file" ] || continue
+                size=$(wc -c <"$file") || exit 1
+                total=$((total + size))
+                [ "$size" -le 2097152 ] && [ "$total" -le 8388608 ] || exit 1
+                hash=$(sha256sum "$file") || exit 1
+                hash=${hash%% *}
+                printf 'FILE %s %s %s\n' "$name" "$size" "$hash" >&3 || exit 1
+                base64 "$file" >&3 || exit 1
+                printf 'END_FILE\n' >&3 || exit 1
+            done
+            printf 'POLIS_CAPTURE_END %s %s\n' "$nonce" "$boot_id" >&3 || exit 1
+            ;;
+        *) printf 'POLIS_USB_ERROR expected=POLIS_PING\n' >&3 || exit 1 ;;
+    esac
+done

@@ -1,0 +1,5 @@
+[alias]
+firmware = "build -p polis-wired-firmware --target thumbv8m.main-none-eabihf --profile firmware"
+
+[env]
+DEFMT_LOG = "info"

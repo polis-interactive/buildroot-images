@@ -1,0 +1,51 @@
+[workspace]
+resolver = "3"
+members = ["crates/framing", "crates/protocol", "crates/host-api", "firmware", "daemon", "cli"]
+default-members = ["crates/framing", "crates/protocol", "crates/host-api", "daemon", "cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+polis-wired-framing = { path = "crates/framing" }
+polis-wired-protocol = { path = "crates/protocol" }
+polis-wired-host-api = { path = "crates/host-api" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "io-std", "time", "sync", "process", "fs", "signal"] }
+tokio-serial = { version = "5.5", default-features = false }
+kameo = { version = "0.22", default-features = false, features = ["macros"] }
+rmcp = { version = "3", features = ["server", "transport-io"] }
+serde_json = "1"
+anyhow = "1"
+async-trait = "0.1"
+clap = { version = "4", features = ["derive"] }
+fs2 = "0.4"
+rand = "0.9"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+postcard = { version = "1.1.3", default-features = false }
+cobs = { version = "0.3", default-features = false }
+crc = { version = "3.3", default-features = false }
+heapless = { version = "0.9", features = ["serde"] }
+embassy-rp = { version = "0.10.0", default-features = false }
+embassy-executor = { version = "0.10.0", default-features = false }
+embassy-time = { version = "0.5.1", default-features = false }
+embassy-sync = "0.8.0"
+embassy-futures = "0.1.2"
+embassy-usb = "0.6.0"
+assign-resources = "0.5.0"
+cyw43 = "0.7.0"
+cyw43-pio = "0.10.0"
+embedded-io-async = "0.7"
+static_cell = "2.1"
+cortex-m-rt = "0.7.5"
+defmt = "1.0"
+defmt-rtt = "1.0"
+panic-probe = { version = "1.0", features = ["print-defmt"] }
+
+[profile.firmware]
+inherits = "release"
+debug = 2
+lto = true
+codegen-units = 1
+panic = "abort"

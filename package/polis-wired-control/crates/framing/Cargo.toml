@@ -1,0 +1,11 @@
+[package]
+name = "polis-wired-framing"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+postcard.workspace = true
+cobs.workspace = true
+crc.workspace = true

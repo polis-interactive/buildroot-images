@@ -5,6 +5,7 @@ from io import StringIO
 import os
 from pathlib import Path
 import subprocess
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -484,6 +485,33 @@ outputs = ["{output}/images/rpi-firmware"]
         subprocess.run(['sha256sum', '-c', '--quiet', 'SHA256SUMS'], cwd=saved, check=True)
         with self.assertRaises(UserError):
             snapshots.snapshot(self.ctx, output, 'baseline')
+
+    def test_snapshot_archives_cargo_sources_without_build_outputs(self):
+        output = self.output()
+        self.image(output)
+        sources = (
+            'package/control/Cargo.toml', 'package/control/Cargo.lock',
+            'package/control/firmware/src/main.rs',
+            'package/probe/app/Cargo.toml', 'package/probe/app/src/main.rs',
+            'package/control/src/target/mod.rs',
+        )
+        generated = (
+            'package/control/target/debug/daemon',
+            'package/probe/app/target/release/probe',
+            'src/__pycache__/cli.pyc',
+        )
+        for name in sources + generated:
+            path = self.repo / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(name)
+        saved = snapshots.snapshot(self.ctx, output, 'sources-only')
+        with tarfile.open(saved / 'external-at-capture.tar.gz') as archive:
+            names = set(archive.getnames())
+        self.assertTrue(set(sources) <= names)
+        self.assertTrue(set(generated).isdisjoint(names))
+        self.assertNotIn('package/control/target', names)
+        self.assertNotIn('package/probe/app/target', names)
+        subprocess.run(['sha256sum', '-c', '--quiet', 'SHA256SUMS'], cwd=saved, check=True)
 
     def test_failed_snapshot_retains_incomplete_marker(self):
         output = self.output()

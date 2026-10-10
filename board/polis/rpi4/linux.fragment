@@ -1,7 +1,28 @@
-# Keep the UART for the test; never send kernel console traffic to it.
+# Boot diagnostics go to the Pico on UART0, including failed userspace boots.
 CONFIG_SERIAL_AMBA_PL011=y
-# CONFIG_SERIAL_AMBA_PL011_CONSOLE is not set
+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
 CONFIG_NULL_TTY=y
+
+# Pi USB-C diagnostic device, available without userspace module loading.
+CONFIG_USB_SUPPORT=y
+# Upstream bcm2711 input drivers select USB even when explicitly disabled.
+# Do not pull the USB-A host stack back in through those module defaults.
+# CONFIG_JOYSTICK_XPAD is not set
+# CONFIG_TOUCHSCREEN_USB_COMPOSITE is not set
+# CONFIG_INPUT_ATI_REMOTE2 is not set
+# CONFIG_INPUT_KEYSPAN_REMOTE is not set
+# CONFIG_INPUT_POWERMATE is not set
+# CONFIG_INPUT_YEALINK is not set
+# CONFIG_INPUT_CM109 is not set
+# CONFIG_USB is not set
+CONFIG_USB_GADGET=y
+# CONFIG_USB_DWC3 is not set
+CONFIG_USB_DWC2=y
+CONFIG_USB_DWC2_PERIPHERAL=y
+CONFIG_USB_G_SERIAL=y
+# CONFIG_USB_CONFIGFS is not set
+# CONFIG_USB_ETH is not set
+# CONFIG_USB_MASS_STORAGE is not set
 
 # Early application GPIO access without waiting for userspace module loading.
 CONFIG_RASPBERRYPI_GPIOMEM=y
@@ -14,9 +35,8 @@ CONFIG_WLAN_VENDOR_BROADCOM=y
 CONFIG_BRCMFMAC=m
 CONFIG_BRCMFMAC_SDIO=y
 
-# The test has no Ethernet, USB, Bluetooth, display, camera, or audio.
+# The test has no Ethernet, Bluetooth, display, camera, or audio.
 # CONFIG_ETHERNET is not set
-# CONFIG_USB_SUPPORT is not set
 # CONFIG_BT is not set
 # CONFIG_DRM is not set
 # CONFIG_FB is not set

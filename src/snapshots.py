@@ -81,8 +81,10 @@ def snapshot(ctx: Context, source: Path, name: str) -> Path:
     marker = destination / ".incomplete"
     marker.touch()
     # Failures intentionally leave this marker; discovery never offers partial captures.
+    print("Snapshot 1/5: hashing source SD image...", flush=True)
     original_hash = digest(image)
     # Dereference links so every saved artifact is independent of the build output.
+    print("Snapshot 2/5: copying images and configs...", flush=True)
     shutil.copytree(source / "images", destination / "images", symlinks=False)
     configs = destination / "configs"
     configs.mkdir()
@@ -98,7 +100,16 @@ def snapshot(ctx: Context, source: Path, name: str) -> Path:
                "src", "Config.in", "external.desc", "external.mk",
                "configs", "board", "package", "patches", "README.md")
     def archive_filter(info):
-        return None if "__pycache__" in Path(info.name).parts or info.name.endswith(".pyc") else info
+        path = Path(info.name)
+        if "__pycache__" in path.parts or info.name.endswith(".pyc"):
+            return None
+        # Prune Cargo output before tarfile recurses into gigabytes of binaries.
+        # Preserve unrelated source directories that happen to be named target.
+        if path.name == "target" and (ctx.repo / path.parent / "Cargo.toml").is_file():
+            return None
+        return info
+    print("Snapshot 3/5: archiving workspace sources (excluding Cargo target directories)...",
+          flush=True)
     with tarfile.open(destination / "external-at-capture.tar.gz", "w:gz") as archive:
         for name_in_repo in members:
             path = ctx.repo / name_in_repo
@@ -123,9 +134,11 @@ def snapshot(ctx: Context, source: Path, name: str) -> Path:
         used = (int(values["Block count"]) - int(values["Free blocks"])) * int(values["Block size"])
         sizes.append(f"rootfs_used_including_metadata\t{used}")
     (destination / "sizes.tsv").write_text("\n".join(sizes) + "\n")
+    print("Snapshot 4/5: verifying copied SD image...", flush=True)
     if digest(image) != original_hash or digest(destination / "images/sdcard.img") != original_hash:
         raise UserError("Source image changed or copy failed; snapshot remains incomplete.")
     files = sorted(p for p in destination.rglob("*") if p.is_file() and p != marker)
+    print("Snapshot 5/5: checksumming saved artifacts...", flush=True)
     (destination / "SHA256SUMS").write_text("".join(checksum_line(p, destination) for p in files))
     marker.unlink()
     for path in destination.rglob("*"):

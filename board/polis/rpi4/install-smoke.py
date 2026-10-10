@@ -23,6 +23,14 @@ def install(target: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(Path(__file__).with_name("smoke-init-finished.sh"), destination)
     destination.chmod(0o755)
+    # Only Polis overlays include this endpoint; preserve the stock baseline.
+    usb_service = "/usr/libexec/polis-usb-diagnostic"
+    usb_path = target / usb_service.lstrip("/")
+    lines = [line for line in lines if usb_service not in line]
+    if usb_path.is_file():
+        usb_path.chmod(0o755)
+        # Keep startup errors visible on /dev/console (the Pico UART).
+        lines.append(f"::respawn:{usb_service}")
     inittab.write_text("\n".join(lines) + "\n")
 
 

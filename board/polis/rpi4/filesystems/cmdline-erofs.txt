@@ -1,1 +1,1 @@
-root=/dev/mmcblk0p2 rootwait rootfstype=erofs ro console=null
+root=/dev/mmcblk0p2 rootwait rootfstype=erofs ro console=ttyAMA0,115200 polis.smoke=1 g_serial.iProduct=Polis_Pi_Diagnostics

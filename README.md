@@ -41,18 +41,51 @@ describe the `polis_*` profiles.
 - Onboard Wi-Fi with Broadcom firmware and iwd for association and DHCP,
   with openresolv for DNS. NetworkManager and wpa_supplicant are disabled.
   Runtime network provisioning is pending integration of our `wifi-connect` fork.
-- UART0 (`/dev/ttyAMA0`) reserved for the test on GPIO14/TX and GPIO15/RX
+- UART0 (`/dev/ttyAMA0`) sends 115200-baud kernel logs and boot readiness
+  to the Pico on GPIO14/TX and GPIO15/RX
   (header pins 8 and 10). Use 3.3 V UART levels and a common ground.
-- No SSH, serial getty, HDMI getty, or kernel serial console. Bluetooth is
+- No SSH, serial getty, or HDMI getty. The kernel serial console is enabled. Bluetooth is
   disabled to free UART0, following the Raspberry Pi
   [UART documentation](https://www.raspberrypi.com/documentation/computers/configuration.html#configuring-uarts).
-- A kernel fragment disables Ethernet, USB, Bluetooth, graphics/framebuffer,
+- USB-C runs a built-in DWC2 CDC ACM serial gadget for the laptop diagnostic
+  ping. USB-A host support remains disabled.
+- A kernel fragment disables Ethernet, Bluetooth, graphics/framebuffer,
   virtual terminals, audio, and media support. A BusyBox fragment removes cron.
 
 The early GPIO test described below is included; the full application is not.
 There is no interactive management connection in this profile. Images never require Wi-Fi credentials at build
 time; provisioning will happen on the device through our forthcoming fork of
 `balena-os/wifi-connect`.
+
+## Wired diagnostics included in base images
+
+All five `polis_*` profiles include these defaults; rebuilding and reflashing
+preserves them. No manual `cmdline.txt` or `config.txt` edits are needed.
+UART kernel logs start before userspace and `POLIS_SMOKE_READY init uptime=...`
+marks rcS completion. The wired daemon uses that marker by default. This does
+not prove Wi-Fi readiness or the Pi's ability to receive UART commands.
+
+The Pi USB-C port enumerates as `Polis_Pi_Diagnostics` (Linux gadget serial
+VID/PID `0525:a4a7`). A separate init process answers `POLIS_PING` with
+`POLIS_USB_OK uptime=...`. It executes no host-supplied commands and cannot
+block startup while waiting for USB. It runs even if the persistent-data mount
+fails and prevents rcS from running; USB success therefore does not imply init
+readiness. This is a connectivity endpoint, not an SD mass-storage gadget.
+
+```sh
+make build ARGS="--board polis_rpi4_musl_erofs"
+# Flash the resulting image using the existing explicitly selected SD workflow.
+# Boot with the daemon capturing UART, then:
+make wired-usb-test
+```
+
+The USB test selects exactly one device by the diagnostic USB product string,
+never by tty numbering; it does not open the Pico. A pass proves a two-way USB
+data exchange with Linux. It does not qualify power stability or ROM recovery.
+The switched 5 V supply and USB D+/D- wiring must both reach the Pi.
+OTP provisioning and actual recovery flashing remain separate bring-up steps.
+Kernel UART logging adds boot-time overhead; use this diagnostic baseline when
+comparing new timings rather than comparing directly against silent images.
 
 ## Early GPIO test
 
@@ -173,6 +206,32 @@ On a device with a shell, inspect `cat /run/polis-gpio-test.log`; stop with
 `polis-gpio-test [UART_GPIO [UART_PATH [EXPORT_GPIO]]]`, defaulting to
 `26 /dev/ttyAMA0 19`. The original first two arguments retain their meanings;
 the two GPIOs must be distinct and cannot use UART pins 14/15.
+
+## Wired test fixture
+
+[`package/polis-wired-control/`](package/polis-wired-control/README.md) contains
+the Pico 2 W firmware and shared Cargo crates for Pi 4 power control and UART
+capture over USB. Its host daemon and CLI/MCP frontend support verified SD
+reflashing and one optional recovery attempt through a separate Pi USB link.
+See the package recovery guide for Pi 4B OTP and electrical prerequisites.
+This is a separate development fixture; it is not installed into Pi images.
+
+With the Pico in BOOTSEL mode, `make wired-flash` builds, flashes, verifies,
+and starts its firmware with `picotool`. Use `PICO_SERIAL=BOOTSEL_SERIAL` to
+select a particular Pico. Resetting the Pico switches Pi power off.
+
+`make wired-daemon` builds and starts the host daemon in the foreground.
+`make wired-diagnostics` retrieves the current boot's firmware/kernel logs over
+Pi USB. `make wired-benchmark ARGS="--samples 5"` starts repeated normal cold
+boots; `make wired-cli ARGS=status` reports progress and timing summaries.
+See [measurement definitions and required firmware/image updates](package/polis-wired-control/docs/benchmark.md).
+
+No config file is needed: edit fixture constants in
+[`daemon/src/settings.rs`](package/polis-wired-control/daemon/src/settings.rs).
+Ctrl-C stops the daemon. Pi reflashing is enabled for the commissioned bench,
+with its USB/SD identity and known-good image pinned. Automatic recovery requires
+`--auto-recover` on each run and permits one attempt. See the
+[hardware acceptance record](package/polis-wired-control/docs/recovery.md#commissioning-progress--2026-10-09).
 
 ## Wi-Fi provisioning (pending)
 
@@ -427,9 +486,11 @@ The `init` target waits for `POLIS_SMOKE_READY init`. A common
 post-build hook wraps BusyBox's `rcS` startup command while preserving the musl
 data-mount guard. It emits the marker only after all init scripts return,
 before getty starts.
-The probe writes directly to `/dev/ttyAMA0`, so it also works with `console=null`
-and getty disabled. It runs only with `polis.smoke=1`, which the runner adds;
-normal hardware boots leave the application UART untouched.
+The probe writes directly to `/dev/ttyAMA0` at 115200 baud. Every `polis_*`
+base image includes `polis.smoke=1` and `console=ttyAMA0,115200` in its boot
+arguments, so normal hardware boots emit the marker without editing the card.
+The runner also adds the marker argument for the unchanged stock baseline.
+Extended storage/service checks still require `polis.smoke.checks=1`.
 
 This endpoint includes each profile's service startup scripts and stock's
 Ethernet wait. It measures completion of the init sequence, not successful
@@ -637,7 +698,10 @@ defconfig, and the external workspace at capture time. It records SHA-256
 checksums, capture/source timestamps, and sizes in `sizes.tsv`, including ext4
 used space when `dumpe2fs` is installed. Files are independently copied, never
 hard-linked to build outputs. `external-at-capture.tar.gz` records the workspace
-as found; it does not prove which source revision produced a past build.
+as found, excluding Python bytecode/cache files and Cargo `target/` directories
+beside `Cargo.toml`. It does not prove which source revision produced a past build.
+Snapshot progress reports hashing, copying, source archiving, verification, and
+final checksums separately.
 
 Each snapshot contains `images/`, `configs/`, `metadata.txt`, `sizes.tsv`,
 `SHA256SUMS`, and `external-at-capture.tar.gz`. Root filesystem artifacts differ
@@ -824,7 +888,8 @@ the roughly 7.5 s before Linux's timed startup inferred from the 8.4 s power-on
 measurement, assuming comparable boots.
 
 - [ ] **Test disabling PCIe first.** The current kernel still enables
-  `CONFIG_PCI` and `CONFIG_PCIE_BRCMSTB` despite USB support being disabled.
+  `CONFIG_PCI` and `CONFIG_PCIE_BRCMSTB` in that older, USB-disabled capture.
+  The current diagnostic baseline enables USB-C device support.
   PCIe enumeration spans approximately **0.504–0.616 s** in the captured log.
   Confirm that the required microSD, SDIO Wi-Fi, UART, and GPIO paths have no
   PCIe dependency, then test `# CONFIG_PCI is not set` in

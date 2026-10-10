@@ -1,5 +1,5 @@
 #!/bin/sh
-# Opt-in QEMU probe. Normal Pi boots never open or write to the application UART.
+# Extended QEMU checks remain opt-in; the init marker is enabled in base images.
 [ "$1" = start ] || exit 0
 case " $(cat /proc/cmdline) " in
     *" polis.smoke=1 "*) ;;
