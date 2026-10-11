@@ -1,0 +1,8 @@
+schema = 1
+id = "bluetooth-uart-routing"
+description = "Reserve PL011 for diagnostics instead of Bluetooth."
+remove_overlays = ["miniuart-bt"]
+firmware_overlays = ["disable-bt"]
+
+[kernel]
+"CONFIG_BT" = "n"

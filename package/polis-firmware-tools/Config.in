@@ -1,7 +1,0 @@
-config BR2_PACKAGE_POLIS_FIRMWARE_TOOLS
-	bool "polis-firmware-tools"
-	depends on BR2_aarch64
-	help
-	  Raspberry Pi's vclog and vcgencmd utilities for reading retained
-	  VideoCore logs and bootloader configuration after Linux starts.
-	  These tools do not enable UART tracing or update the EEPROM.

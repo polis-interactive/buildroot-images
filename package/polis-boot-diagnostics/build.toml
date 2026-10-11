@@ -1,0 +1,17 @@
+[[steps]]
+name = "boot-diagnostics-tools"
+when = "BR2_PACKAGE_POLIS_BOOT_DIAGNOSTICS"
+targets = ["boot-diagnostics-tools-dirclean", "boot-diagnostics-tools"]
+inputs = ["package/polis-boot-diagnostics/boot-diagnostics-tools"]
+config = ["BR2_PACKAGE_POLIS_BOOT_DIAGNOSTICS*", "BR2_POLIS_PREFER_STATIC"]
+outputs = ["{output}/build/boot-diagnostics-tools-*/.stamp_built", "{output}/target/usr/bin/vclog", "{output}/target/usr/bin/vcgencmd"]
+
+[[steps]]
+name = "boot-diagnostics"
+depends_on = ["boot-diagnostics-tools"]
+when = "BR2_PACKAGE_POLIS_BOOT_DIAGNOSTICS"
+# Re-extract changed local sources so removed/renamed files cannot survive rsync.
+targets = ["polis-boot-diagnostics-dirclean", "polis-boot-diagnostics"]
+inputs = ["package/polis-boot-diagnostics"]
+config = ["BR2_PACKAGE_POLIS_BOOT_DIAGNOSTICS*", "BR2_PACKAGE_HOST_RUSTC*", "BR2_POLIS_PREFER_STATIC"]
+outputs = ["{output}/build/polis-boot-diagnostics-*/.stamp_built", "{output}/target/usr/bin/polis-boot-diagnostics", "{output}/target/etc/init.d/polis-boot-diagnostics"]

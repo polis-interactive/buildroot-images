@@ -211,7 +211,7 @@ impl RealBackend {
             "image":image, "images":images, "confirm_fixture":self.config.fixture}))?;
         let mut command = Process::new("python3");
         command
-            .args(["-m", "src.wired_storage"])
+            .args(["-m", "src.wired.storage"])
             .current_dir(&self.config.repo_root)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
@@ -256,7 +256,7 @@ impl RealBackend {
             "explicit Pi USB topology required"
         );
         let mut child = Process::new("python3")
-            .args(["-m", "src.wired_capture"])
+            .args(["-m", "src.wired.capture"])
             .current_dir(&self.config.repo_root)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())

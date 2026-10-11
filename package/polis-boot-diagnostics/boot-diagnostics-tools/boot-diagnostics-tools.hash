@@ -1,0 +1,4 @@
+# Locally computed from the pinned raspberrypi/utils archive and license files.
+sha256  9a39cf33310b408fdd24bdd5586db6f4caa722e6ab96fbec944929eeb749b360  boot-diagnostics-tools-67b2a9f0b4e10ebdfe3c9cc8e616ac5c1bfa4e69.tar.gz
+sha256  731da956431d1a7c5073e7ee5ebe01f54e359c5339310b32f0893c6fe6507d5a  LICENCE
+sha256  f73a0d0c93c5c1b7960a8d1f06741b4f76f994a49dcc96812fe7854caf7217cf  vcgencmd/vcgencmd.c

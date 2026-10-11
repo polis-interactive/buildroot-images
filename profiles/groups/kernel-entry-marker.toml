@@ -1,0 +1,8 @@
+schema = 1
+id = "kernel-entry-marker"
+description = "Emit the benchmark marker at Linux entry."
+requires = ["uart-diagnostics"]
+inputs = ["board/rpi4/kernel-entry.patch", "board/rpi4/install-kernel-entry.py", "board/rpi4/kernel-entry.mk"]
+
+[buildroot]
+"BR2_POLIS_KERNEL_ENTRY" = "y"

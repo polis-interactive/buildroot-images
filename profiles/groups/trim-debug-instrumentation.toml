@@ -1,0 +1,20 @@
+schema = 1
+id = "trim-debug-instrumentation"
+description = "Remove unused profiling/debug instrumentation; retain boot logs."
+evidence = ["P04"]
+
+[kernel]
+"CONFIG_KALLSYMS_ALL" = "n"
+"CONFIG_FTRACE" = "n"
+"CONFIG_KPROBES" = "n"
+"CONFIG_UPROBES" = "n"
+"CONFIG_PROFILING" = "n"
+"CONFIG_PERF_EVENTS" = "n"
+"CONFIG_KGDB" = "n"
+"CONFIG_SCHEDSTATS" = "n"
+"CONFIG_SCHED_DEBUG" = "n"
+"CONFIG_LATENCYTOP" = "n"
+"CONFIG_SLUB_DEBUG" = "n"
+"CONFIG_BPF_SYSCALL" = "n"
+"CONFIG_TASKSTATS" = "n"
+"CONFIG_PSI" = "n"

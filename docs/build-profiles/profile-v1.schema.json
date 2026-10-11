@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "Polis build profile version 1",
+  "description": "Profile choices come from src/profiles/options.py. Dependency and capability resolution must also succeed before building.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "name",
+    "base",
+    "requires",
+    "groups"
+  ],
+  "properties": {
+    "schema": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "name": {
+      "$ref": "#/definitions/id"
+    },
+    "base": {
+      "type": "string",
+      "enum": [
+        "polis-rpi4-v1"
+      ]
+    },
+    "requires": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "boot-diagnostics",
+          "uart-diagnostics",
+          "usb-diagnostics",
+          "wifi",
+          "display",
+          "camera"
+        ]
+      }
+    },
+    "groups": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "polis-runtime",
+          "boot-diagnostics",
+          "wifi-iwd",
+          "uart-diagnostics",
+          "usb-diagnostics",
+          "kernel-entry-marker",
+          "headless",
+          "no-ethernet",
+          "bluetooth-uart-routing",
+          "usb-peripheral-only",
+          "no-input",
+          "no-32bit",
+          "no-containers",
+          "local-storage-only",
+          "kernel-size",
+          "trim-debug-instrumentation",
+          "no-cron",
+          "skip-hat-eeprom",
+          "skip-poe-fan",
+          "lz4-kernel",
+          "cutdown-firmware",
+          "premerge-overlays",
+          "boot-ramdisk",
+          "eeprom-no-net-install"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    }
+  },
+  "$comment": "Enum choices are generated from src/profiles/options.py. Run python -m src.profiles.schema after changing them."
+}

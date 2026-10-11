@@ -8,9 +8,9 @@ import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
-from src import wired_storage as storage
+from src.wired import storage
 from src.common import UserError
-from src.images import validate_disk
+from src.artifacts.images import validate_disk
 
 
 class WiredStorageTest(unittest.TestCase):

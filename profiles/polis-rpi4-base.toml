@@ -1,0 +1,6 @@
+#:schema ../docs/build-profiles/profile.schema.json
+schema = 1
+name = "polis-rpi4-base"
+base = "polis-rpi4-v1"
+requires = []
+groups = []

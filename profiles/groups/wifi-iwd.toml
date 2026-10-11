@@ -1,0 +1,21 @@
+schema = 1
+id = "wifi-iwd"
+description = "Load Wi-Fi after root mounting; iwd owns IP configuration."
+provides = ["wifi"]
+overlays = ["profiles/groups/wifi-iwd/rootfs-overlay"]
+
+[buildroot]
+"BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI" = "y"
+"BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI_WIFI" = "y"
+"BR2_PACKAGE_IWD" = "y"
+"BR2_PACKAGE_OPENRESOLV" = "y"
+"BR2_PACKAGE_NETWORK_MANAGER" = "n"
+"BR2_PACKAGE_WPA_SUPPLICANT" = "n"
+"BR2_SYSTEM_DHCP" = ""
+
+[kernel]
+"CONFIG_WLAN" = "y"
+"CONFIG_CFG80211" = "m"
+"CONFIG_WLAN_VENDOR_BROADCOM" = "y"
+"CONFIG_BRCMFMAC" = "m"
+"CONFIG_BRCMFMAC_SDIO" = "y"

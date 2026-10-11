@@ -1,0 +1,21 @@
+schema = 1
+id = "headless"
+description = "No graphics, camera or audio; suppress firmware framebuffers."
+overlays = ["profiles/groups/headless/rootfs-overlay"]
+disables = ["display", "camera"]
+remove_firmware = ["disable_overscan", "gpu_mem_256", "gpu_mem_512", "gpu_mem_1024"]
+evidence = ["P03"]
+
+[kernel]
+"CONFIG_DRM" = "n"
+"CONFIG_FB" = "n"
+"CONFIG_FB_CORE" = "n"
+"CONFIG_FRAMEBUFFER_CONSOLE" = "n"
+"CONFIG_VT" = "n"
+"CONFIG_SOUND" = "n"
+"CONFIG_MEDIA_SUPPORT" = "n"
+
+[firmware]
+"disable_splash" = "1"
+"max_framebuffers" = "0"
+"dtparam" = "audio=off"

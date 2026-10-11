@@ -1,0 +1,7 @@
+schema = 1
+id = "no-cron"
+description = "Remove cron tools and daemon."
+
+[busybox]
+"CONFIG_CROND" = "n"
+"CONFIG_CRONTAB" = "n"

@@ -1,0 +1,6 @@
+schema = 1
+id = "skip-poe-fan"
+description = "Skip PoE fan probing."
+
+[firmware]
+"disable_poe_fan" = "1"

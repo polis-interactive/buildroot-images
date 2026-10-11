@@ -1,0 +1,12 @@
+schema = 1
+id = "no-containers"
+description = "Remove guest and container support."
+evidence = ["P04"]
+
+[kernel]
+"CONFIG_VIRTUALIZATION" = "n"
+"CONFIG_CGROUPS" = "n"
+"CONFIG_NAMESPACES" = "n"
+"CONFIG_CHECKPOINT_RESTORE" = "n"
+"CONFIG_SCHED_AUTOGROUP" = "n"
+"CONFIG_ANDROID_BINDER_IPC" = "n"

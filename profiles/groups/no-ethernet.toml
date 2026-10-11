@@ -1,0 +1,9 @@
+schema = 1
+id = "no-ethernet"
+description = "Remove Ethernet support."
+
+[kernel]
+"CONFIG_ETHERNET" = "n"
+
+[buildroot]
+"BR2_SYSTEM_DHCP" = ""

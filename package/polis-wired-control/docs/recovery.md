@@ -4,6 +4,18 @@ Design verified against the linked official sources on 2026-10-09. Software
 verification and physical fixture qualification are separate; no OTP or hardware
 flash is performed while implementing this workspace.
 
+Current host permission setup is `make setup-permissions`, using the tracked
+[udev policy](../udev/README.md). It replaces the earlier port/user-specific
+install scripts described in the historical commissioning record below.
+Permission rules now match supported device types; the daemon still pins and
+validates the commissioned fixture's USB topology, serial and SD LUN identity.
+
+Current RAM payload setup is also reproducible: `make setup` prepares
+`local/polis-wired-tools/gadget/` from the pinned download and the package's
+[recovery sources](../recovery/README.md). The daemon uses that path. References
+to `local/polis-recovery/` below describe historical commissioning artifacts;
+that directory is no longer required by the tools.
+
 ## Current bench wiring and evidence — 2026-10-09
 
 The Pi's current source is a **dedicated 5 V supply through the controlled
@@ -70,6 +82,12 @@ provisions GPIO-forced rpiboot. OTP is board state, not SD-image state; it has
 not been read from this Pi.
 
 Host preparation is complete, without changing physical-device state:
+
+`make setup` now downloads the pinned `usbboot` checkout and its EEPROM submodule
+and builds `rpiboot` under `local/usbboot/`. That directory can be recreated after
+deletion. See the repository [setup instructions](../../../README.md#build-tools-and-incremental-work)
+for host prerequisites. Setup now recreates the same commissioned gadget bytes
+under `local/polis-wired-tools/gadget/`; provisioning records remain separate.
 
 - Official `usbboot` commit `861a703d8b51f42b76bcdff49da3e0f2766966bf`
   is checked out under `local/usbboot`; `make -C local/usbboot` built `rpiboot`.
@@ -314,7 +332,7 @@ recovery attempt. The daemon never starts/resumes a workflow merely on startup.
 Run journals and raw UART/event logs retain stages, errors, and prior failed
 readiness attempts. Interrupted runs require a new explicit invocation.
 
-The Python storage adapter reuses `src.images` image discovery and destination
+The Python storage adapter reuses `src.artifacts.images` image discovery and destination
 validation. It adds exact udev/topology selection, source hash pinning, exclusive
 block-device opening, source/destination rechecks, mounted/swap/holder rejection,
 fsync and direct-I/O read-back verification that bypasses the host page cache. It never unmounts disks,

@@ -1,0 +1,8 @@
+schema = 1
+id = "eeprom-no-net-install"
+description = "Provision NET_INSTALL_ENABLED=0 on the commissioned Pi; not an SD-image setting."
+inputs = ["board/rpi4/post-firmware"]
+evidence = ["P08"]
+
+[eeprom]
+NET_INSTALL_ENABLED = "0"

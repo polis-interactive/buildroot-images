@@ -1,0 +1,9 @@
+schema = 1
+id = "musl-toolchain"
+description = "Bootlin AArch64 musl toolchain."
+inputs = ["patches/musl"]
+
+[buildroot]
+"BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_AARCH64_GLIBC_STABLE" = "n"
+"BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_AARCH64_MUSL_STABLE" = "y"
+"BR2_GLOBAL_PATCH_DIR" = "board/raspberrypi/patches $(BR2_EXTERNAL_POLIS_PATH)/patches/musl"

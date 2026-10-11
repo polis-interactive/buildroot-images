@@ -1,0 +1,7 @@
+schema = 1
+id = "no-32bit"
+description = "Native AArch64 executables only."
+evidence = ["P04"]
+
+[kernel]
+"CONFIG_COMPAT" = "n"

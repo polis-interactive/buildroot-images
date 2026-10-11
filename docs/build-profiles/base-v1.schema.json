@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "Polis build base version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "name",
+    "groups",
+    "upstream",
+    "static_core"
+  ],
+  "properties": {
+    "schema": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "name": {
+      "type": "string",
+      "enum": [
+        "polis-rpi4-v1"
+      ]
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "musl-toolchain",
+          "erofs-root",
+          "static-core"
+        ]
+      }
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "buildroot",
+        "defconfig"
+      ],
+      "properties": {
+        "buildroot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "defconfig": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+_defconfig$"
+        }
+      }
+    },
+    "static_core": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "when_selected",
+        "allow_other_dynamic_executables"
+      ],
+      "properties": {
+        "required": {
+          "$ref": "#/definitions/programs",
+          "minItems": 1
+        },
+        "when_selected": {
+          "$ref": "#/definitions/programs"
+        },
+        "allow_other_dynamic_executables": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "programs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?:[A-Za-z0-9_-]+/)+[A-Za-z0-9_.+-]+$"
+      }
+    }
+  },
+  "$comment": "Enum choices are generated from src/profiles/options.py. Run python -m src.profiles.schema after changing them."
+}

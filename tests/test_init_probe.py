@@ -7,7 +7,7 @@ import unittest
 
 
 REPO = Path(__file__).resolve().parents[1]
-INSTALLER = REPO / "board/polis/rpi4/install-smoke.py"
+INSTALLER = REPO / "board/rpi4/install-smoke.py"
 
 
 class InitProbeTest(unittest.TestCase):

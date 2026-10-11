@@ -67,12 +67,14 @@ afterward. Pin an official RAM gadget payload containing `config.txt`, `boot.img
 and either `bootfiles.bin` with `2711/bootcode4.bin` or a loose `bootcode4.bin`;
 EEPROM/OTP recovery payloads are rejected. The prepared payload and commissioning
 status are recorded in [recovery.md](recovery.md#commissioning-progress--2026-10-09).
+`make setup` recreates the commissioned payload at `local/polis-wired-tools/gadget/`
+using the tracked [recovery recipe and checksum](../recovery/README.md).
 Hashes can be computed without device access:
 
 ```sh
 sha256sum /absolute/path/to/known-good/sdcard.img
 # From the BuildrootImages repository root:
-python3 -m src.wired_storage payload-hash /opt/polis-recovery/mass-storage-gadget64
+python3 -m src.wired.storage payload-hash local/polis-wired-tools/gadget
 ```
 
 The directory hash includes each relative filename and the SHA-256 of its bytes,
@@ -85,12 +87,19 @@ open the selected block device exclusively. Readback uses page-aligned Linux
 root-only `BLKFLSBUF`. Direct-I/O support and sector alignment are checked before
 the first write; failed direct reads never fall back to buffered verification.
 See the Linux [O_DIRECT alignment documentation](https://man7.org/linux/man-pages/man2/open.2.html#NOTES).
-Supply device permissions through the commissioned udev rules. The daemon
+Install device permissions using `make setup-permissions` from the repository
+root, with `WIRED_USER=account` to select a different daemon user. The tracked
+[udev rules and installer](../udev/README.md) use the `polis-wired` group and
+device-type matches instead of an individual username, serial or host USB port.
+Group members can access all matching devices; the daemon's commissioned
+topology and identity checks still determine which fixture it may operate.
+Log out and back in, restart the daemon, and reconnect devices while idle.
+The daemon
 never invokes sudo or changes permissions on
 physical devices. Host tools: Python 3, `lsblk`, `udevadm`, and `rpiboot` with `-p`
 support. Disable automount for the commissioned recovery gadget; mounted media,
 swap, and active device-mapper/RAID holders are refused, never auto-unmounted.
-The Python helper must run from this repository so it can reuse `src.images`.
+The Python helper must run from this repository so it can reuse `src.artifacts.images`.
 
 ## Commands after separately authorized bring-up
 

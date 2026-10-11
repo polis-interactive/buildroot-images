@@ -75,7 +75,7 @@ impl Runtime {
             Action::Images => {
                 use tokio::io::AsyncWriteExt;
                 let mut child = tokio::process::Command::new("python3")
-                    .args(["-m", "src.wired_storage"])
+                    .args(["-m", "src.wired.storage"])
                     .current_dir(&self.config.repo_root)
                     .stdin(std::process::Stdio::piped())
                     .stdout(std::process::Stdio::piped())

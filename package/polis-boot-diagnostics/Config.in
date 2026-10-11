@@ -1,0 +1,18 @@
+config BR2_PACKAGE_POLIS_BOOT_DIAGNOSTICS
+	bool "polis-boot-diagnostics"
+	depends on BR2_aarch64
+	depends on BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	select BR2_PACKAGE_HOST_RUSTC
+	select BR2_PACKAGE_BOOT_DIAGNOSTICS_TOOLS
+	help
+	  Collect one immutable kernel/firmware diagnostic capture per boot.
+	  Runs in the background, waits for writable /data, saves and flushes
+	  the capture, then exits. Uses no GPIO pins or UART device.
+	  Requires the package's install.py post-build hook.
+	  Includes vclog and vcgencmd for the saved firmware diagnostics.
+
+# Internal upstream-source helper; enabled through the collector.
+config BR2_PACKAGE_BOOT_DIAGNOSTICS_TOOLS
+	bool
+	depends on BR2_aarch64

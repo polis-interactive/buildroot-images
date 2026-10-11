@@ -1,3 +1,0 @@
-# The root filesystem and its decompressor must be built in.
-CONFIG_SQUASHFS=y
-CONFIG_SQUASHFS_LZ4=y

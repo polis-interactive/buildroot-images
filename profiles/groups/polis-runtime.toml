@@ -1,0 +1,15 @@
+schema = 1
+id = "polis-runtime"
+description = "Polis identity and boot-readiness instrumentation."
+overlays = ["profiles/groups/polis-runtime/rootfs-overlay"]
+post_build = ["board/rpi4/install-smoke.py"]
+inputs = ["board/rpi4/smoke-init-finished.sh"]
+
+[buildroot]
+"BR2_LINUX_KERNEL_INTREE_DTS_NAME" = "broadcom/bcm2711-rpi-4-b"
+"BR2_TARGET_GENERIC_HOSTNAME" = "polis-rpi4"
+"BR2_TARGET_GENERIC_ISSUE" = "Polis Raspberry Pi 4 test image"
+"BR2_TARGET_GENERIC_GETTY" = "n"
+
+[cmdline]
+"polis.smoke" = "1"

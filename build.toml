@@ -1,7 +1,7 @@
 # Project build policy. Paths are relative to this repository unless absolute.
 # Config-path values follow Buildroot's path convention (relative to Buildroot).
 schema = 1
-includes = ["package/*/build.toml"]
+includes = ["package/*/build.toml", "build-support/static-core/build.toml"]
 exclude = ["target", ".git", "__pycache__", "*.pyc"]
 
 [variables]
@@ -10,20 +10,8 @@ TOPDIR = "{buildroot}"
 BASE_DIR = "{output}"
 
 [defaults]
-inputs = ["{buildroot}/Makefile", "external.mk", "src/builds.py", "src/incremental.py"]
+inputs = ["{buildroot}/Makefile", "external.mk", "src/build", "src/common.py", "profiles", "src/profiles"]
 config = ["BR2_ARCH*", "BR2_aarch64", "BR2_ARM*", "BR2_cortex*", "BR2_TOOLCHAIN*", "BR2_GCC*", "BR2_TARGET_OPTIMIZATION", "BR2_TARGET_LDFLAGS", "BR2_SHARED*", "BR2_STATIC*", "BR2_ENABLE_DEBUG", "BR2_DEBUG*", "BR2_OPTIMIZE*", "BR2_REPRODUCIBLE"]
-
-[configure]
-targets = ["{board}_defconfig"]
-inputs = ["configs/{board}_defconfig", "Config.in", "external.desc", "package/Config.in", "package/*/Config.in", "{buildroot}/Config.in", "{buildroot}/Config.in.legacy", "{buildroot}/arch/Config.in*", "{buildroot}/toolchain/Config.in*"]
-outputs = ["{output}/.config"]
-
-[image]
-targets = ["all"]
-inputs = ["board", "package", "patches", "Config.in", "configs/{board}_defconfig"]
-config = ["*"]
-config_paths = ["BR2_ROOTFS_OVERLAY", "BR2_ROOTFS_PRE_BUILD_SCRIPT", "BR2_ROOTFS_POST_BUILD_SCRIPT", "BR2_ROOTFS_POST_FAKEROOT_SCRIPT", "BR2_ROOTFS_POST_IMAGE_SCRIPT", "BR2_ROOTFS_DEVICE_TABLE", "BR2_ROOTFS_STATIC_DEVICE_TABLE", "BR2_ROOTFS_USERS_TABLES"]
-outputs = ["{output}/images/sdcard.img", "{output}/images"]
 
 [[steps]]
 name = "kernel-source"
@@ -40,7 +28,7 @@ name = "kernel"
 when = "BR2_LINUX_KERNEL"
 depends_on = ["kernel-source"]
 targets = ["linux-reconfigure"]
-inputs = ["{buildroot}/linux", "board/polis/rpi4/kernel-entry.patch", "board/polis/rpi4/install-kernel-entry.py", "package/polis-kernel-entry/kernel-entry.mk"]
+inputs = ["{buildroot}/linux", "board/rpi4/kernel-entry.patch", "board/rpi4/install-kernel-entry.py", "board/rpi4/kernel-entry.mk"]
 config = ["BR2_LINUX_KERNEL*"]
 config_paths = ["BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE", "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES", "BR2_LINUX_KERNEL_CUSTOM_DTS_PATH", "BR2_LINUX_KERNEL_CUSTOM_DTS_DIR", "BR2_LINUX_KERNEL_CUSTOM_LOGO_PATH"]
 outputs = ["{output}/build/linux-*/.stamp_built", "{output}/build/linux-*/.config", "{output}/images/Image"]

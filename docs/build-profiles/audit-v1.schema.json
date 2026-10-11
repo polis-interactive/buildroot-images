@@ -1,0 +1,492 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Polis build audit version 1",
+  "description": "Structural contract. Lifecycle, ownership, references and coverage must also be checked by the resolver.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "example",
+    "state",
+    "profile",
+    "base",
+    "resolver",
+    "plan_sha256",
+    "inputs",
+    "groups",
+    "changes",
+    "coverage",
+    "checks",
+    "hardware",
+    "artifacts"
+  ],
+  "properties": {
+    "schema": {
+      "type": "integer",
+      "const": 1
+    },
+    "example": {
+      "type": "boolean",
+      "description": "True is documentation-only and must never be accepted as a build plan."
+    },
+    "state": {
+      "enum": [
+        "planned",
+        "configured",
+        "built",
+        "failed"
+      ]
+    },
+    "profile": {
+      "$ref": "#/$defs/id"
+    },
+    "base": {
+      "type": "string",
+      "enum": [
+        "polis-rpi4-v1"
+      ]
+    },
+    "resolver": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/file"
+      }
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/group"
+      }
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "coverage": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/coverage"
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "hardware": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hardware"
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/file"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "built"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "artifacts": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "enum": [
+        "buildroot",
+        "kernel",
+        "busybox",
+        "firmware",
+        "cmdline",
+        "rootfs",
+        "image",
+        "eeprom"
+      ]
+    },
+    "comparison": {
+      "enum": [
+        "upstream-to-base",
+        "base-to-profile"
+      ]
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "root": {
+          "enum": [
+            "repo",
+            "buildroot",
+            "output",
+            "tools"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 511
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "selected_by",
+        "evidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": [
+            "musl-toolchain",
+            "erofs-root",
+            "static-core",
+            "polis-runtime",
+            "boot-diagnostics",
+            "wifi-iwd",
+            "uart-diagnostics",
+            "usb-diagnostics",
+            "kernel-entry-marker",
+            "headless",
+            "no-ethernet",
+            "bluetooth-uart-routing",
+            "usb-peripheral-only",
+            "no-input",
+            "no-32bit",
+            "no-containers",
+            "local-storage-only",
+            "kernel-size",
+            "trim-debug-instrumentation",
+            "no-cron",
+            "skip-hat-eeprom",
+            "skip-poe-fan",
+            "lz4-kernel",
+            "cutdown-firmware",
+            "premerge-overlays",
+            "boot-ramdisk",
+            "eeprom-no-net-install"
+          ]
+        },
+        "selected_by": {
+          "enum": [
+            "base",
+            "profile"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison",
+        "stage",
+        "domain",
+        "key",
+        "before",
+        "after",
+        "owners",
+        "basis",
+        "caused_by",
+        "reason",
+        "payloads"
+      ],
+      "properties": {
+        "comparison": {
+          "$ref": "#/$defs/comparison"
+        },
+        "stage": {
+          "enum": [
+            "requested",
+            "effective"
+          ]
+        },
+        "domain": {
+          "$ref": "#/$defs/domain"
+        },
+        "key": {
+          "$ref": "#/$defs/text"
+        },
+        "before": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "after": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owners": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "musl-toolchain",
+              "erofs-root",
+              "static-core",
+              "polis-runtime",
+              "boot-diagnostics",
+              "wifi-iwd",
+              "uart-diagnostics",
+              "usb-diagnostics",
+              "kernel-entry-marker",
+              "headless",
+              "no-ethernet",
+              "bluetooth-uart-routing",
+              "usb-peripheral-only",
+              "no-input",
+              "no-32bit",
+              "no-containers",
+              "local-storage-only",
+              "kernel-size",
+              "trim-debug-instrumentation",
+              "no-cron",
+              "skip-hat-eeprom",
+              "skip-poe-fan",
+              "lz4-kernel",
+              "cutdown-firmware",
+              "premerge-overlays",
+              "boot-ramdisk",
+              "eeprom-no-net-install"
+            ]
+          }
+        },
+        "basis": {
+          "enum": [
+            "direct",
+            "derived"
+          ]
+        },
+        "caused_by": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "domain",
+              "key"
+            ],
+            "properties": {
+              "domain": {
+                "$ref": "#/$defs/domain"
+              },
+              "key": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "reason": {
+          "$ref": "#/$defs/text"
+        },
+        "payloads": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "const": "derived"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "caused_by": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "caused_by": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison",
+        "domain",
+        "status",
+        "detail"
+      ],
+      "properties": {
+        "comparison": {
+          "$ref": "#/$defs/comparison"
+        },
+        "domain": {
+          "$ref": "#/$defs/domain"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "complete",
+            "not-applicable"
+          ]
+        },
+        "detail": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "phase",
+        "status",
+        "detail"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "phase": {
+          "enum": [
+            "configuration",
+            "artifact"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "passed",
+            "failed"
+          ]
+        },
+        "detail": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "expected",
+        "status",
+        "evidence"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/text"
+        },
+        "expected": {
+          "$ref": "#/$defs/text"
+        },
+        "status": {
+          "enum": [
+            "unverified",
+            "verified",
+            "mismatch"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "evidence": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$comment": "Enum choices are generated from src/profiles/options.py. Run python -m src.profiles.schema after changing them."
+}

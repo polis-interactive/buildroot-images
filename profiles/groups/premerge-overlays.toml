@@ -1,0 +1,9 @@
+schema = 1
+id = "premerge-overlays"
+description = "Bake UART/Bluetooth and USB peripheral overlays into the DTB."
+requires = ["bluetooth-uart-routing", "usb-diagnostics"]
+inputs = ["board/rpi4/premerge-dtb.py", "package/polis-dtmerge"]
+evidence = ["P07"]
+
+[buildroot]
+"BR2_PACKAGE_HOST_POLIS_DTMERGE" = "y"

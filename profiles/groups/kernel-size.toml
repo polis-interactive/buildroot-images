@@ -1,0 +1,8 @@
+schema = 1
+id = "kernel-size"
+description = "Optimize the kernel for size."
+evidence = ["P04"]
+
+[kernel]
+"CONFIG_CC_OPTIMIZE_FOR_SIZE" = "y"
+"CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE" = "n"

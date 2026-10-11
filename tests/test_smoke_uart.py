@@ -11,7 +11,7 @@ import termios
 import unittest
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'board/polis/rpi4/smoke-init-finished.sh'
+SCRIPT = Path(__file__).resolve().parents[1] / 'board/rpi4/smoke-init-finished.sh'
 
 
 class SmokeUartTest(unittest.TestCase):

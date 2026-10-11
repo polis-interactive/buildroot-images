@@ -1,6 +1,0 @@
-# Firmware loads the external archive; do not embed it in Image.
-CONFIG_BLK_DEV_INITRD=y
-CONFIG_RD_LZ4=y
-CONFIG_INITRAMFS_SOURCE=""
-CONFIG_DEVTMPFS=y
-CONFIG_DEVTMPFS_MOUNT=y

@@ -1,0 +1,4 @@
+schema = 1
+id = "boot-ramdisk"
+description = "Load the compact boot FAT into RAM before firmware starts."
+evidence = ["P09"]

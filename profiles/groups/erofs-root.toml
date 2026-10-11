@@ -1,0 +1,27 @@
+schema = 1
+remove_buildroot = ["BR2_TARGET_ROOTFS_EXT2_4", "BR2_TARGET_ROOTFS_EXT2_SIZE"]
+id = "erofs-root"
+description = "Read-only EROFS LZ4HC root, persistent ext4 data, and volatile runtime mounts."
+remove_cmdline = ["rw"]
+overlays = ["profiles/base/rootfs-overlay"]
+inputs = ["src/profiles/image.py", "profiles/post-image.py"]
+
+[buildroot]
+"BR2_TARGET_ROOTFS_EXT2" = "n"
+"BR2_TARGET_ROOTFS_EROFS" = "y"
+"BR2_TARGET_ROOTFS_EROFS_LZ4HC" = "y"
+"BR2_TARGET_ROOTFS_EROFS_LZ4HC_LEVEL" = "9"
+"BR2_TARGET_GENERIC_REMOUNT_ROOTFS_RW" = "n"
+"BR2_PACKAGE_HOST_E2FSPROGS" = "y"
+
+[kernel]
+"CONFIG_EROFS_FS" = "y"
+"CONFIG_EROFS_FS_ZIP" = "y"
+"CONFIG_EXT4_FS" = "y"
+"CONFIG_TMPFS" = "y"
+"CONFIG_DEVTMPFS" = "y"
+"CONFIG_DEVTMPFS_MOUNT" = "y"
+
+[cmdline]
+"rootfstype" = "erofs"
+"ro" = ""

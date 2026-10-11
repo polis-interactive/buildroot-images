@@ -1,0 +1,326 @@
+{
+  "schema": 1,
+  "example": true,
+  "state": "planned",
+  "profile": "rpi4-speed",
+  "base": "polis-rpi4-v1",
+  "resolver": "format-example-only",
+  "plan_sha256": "43e969048cde861e40d422dd10bd82c65977dc4ad745a5a49f1a51738c7b8c41",
+  "inputs": [
+    {
+      "root": "repo",
+      "path": "docs/build-profiles/examples/base.toml",
+      "sha256": "0847a88f510217c4de1f66820eccd9b5d7041d04a510b846d94f9c7c3e0e6d77"
+    },
+    {
+      "root": "repo",
+      "path": "docs/build-profiles/examples/profile.toml",
+      "sha256": "70f59f97f78af86c7e6fa559596036c6fbae7199ca9ccde74a1b26bd948908b2"
+    }
+  ],
+  "groups": [
+    {
+      "id": "musl-toolchain",
+      "selected_by": "base",
+      "evidence": []
+    },
+    {
+      "id": "erofs-root",
+      "selected_by": "base",
+      "evidence": []
+    },
+    {
+      "id": "static-core",
+      "selected_by": "base",
+      "evidence": []
+    },
+    {
+      "id": "polis-runtime",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "boot-diagnostics",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "wifi-iwd",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "uart-diagnostics",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "usb-diagnostics",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "kernel-entry-marker",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "headless",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "no-ethernet",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "bluetooth-uart-routing",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "usb-peripheral-only",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "no-input",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "no-32bit",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "no-containers",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "local-storage-only",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "kernel-size",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "trim-debug-instrumentation",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "no-cron",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "skip-hat-eeprom",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "skip-poe-fan",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "lz4-kernel",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "premerge-overlays",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "boot-ramdisk",
+      "selected_by": "profile",
+      "evidence": []
+    },
+    {
+      "id": "cutdown-firmware",
+      "selected_by": "profile",
+      "evidence": [
+        "P06"
+      ]
+    },
+    {
+      "id": "eeprom-no-net-install",
+      "selected_by": "profile",
+      "evidence": [
+        "P08"
+      ]
+    }
+  ],
+  "changes": [
+    {
+      "comparison": "upstream-to-base",
+      "stage": "requested",
+      "domain": "buildroot",
+      "key": "BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_AARCH64_MUSL_STABLE",
+      "before": "n",
+      "after": "y",
+      "owners": [
+        "musl-toolchain"
+      ],
+      "basis": "direct",
+      "caused_by": [],
+      "reason": "Illustrative requested base change: use the musl toolchain.",
+      "payloads": []
+    },
+    {
+      "comparison": "upstream-to-base",
+      "stage": "requested",
+      "domain": "buildroot",
+      "key": "BR2_TARGET_ROOTFS_EROFS",
+      "before": "n",
+      "after": "y",
+      "owners": [
+        "erofs-root"
+      ],
+      "basis": "direct",
+      "caused_by": [],
+      "reason": "Illustrative requested base change: select an EROFS root filesystem.",
+      "payloads": []
+    },
+    {
+      "comparison": "upstream-to-base",
+      "stage": "requested",
+      "domain": "busybox",
+      "key": "CONFIG_STATIC",
+      "before": "n",
+      "after": "y",
+      "owners": [
+        "static-core"
+      ],
+      "basis": "direct",
+      "caused_by": [],
+      "reason": "Illustrative requested base change: statically link BusyBox; ELF verification is still pending.",
+      "payloads": []
+    },
+    {
+      "comparison": "base-to-profile",
+      "stage": "requested",
+      "domain": "kernel",
+      "key": "CONFIG_CC_OPTIMIZE_FOR_SIZE",
+      "before": "n",
+      "after": "y",
+      "owners": [
+        "kernel-size"
+      ],
+      "basis": "direct",
+      "caused_by": [],
+      "reason": "Illustrative requested optimization: select size-oriented compilation; no individual speedup is claimed.",
+      "payloads": []
+    }
+  ],
+  "coverage": [
+    {
+      "comparison": "upstream-to-base",
+      "domain": "buildroot",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "upstream-to-base",
+      "domain": "kernel",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "upstream-to-base",
+      "domain": "busybox",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "upstream-to-base",
+      "domain": "firmware",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "upstream-to-base",
+      "domain": "cmdline",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "upstream-to-base",
+      "domain": "rootfs",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "upstream-to-base",
+      "domain": "image",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "base-to-profile",
+      "domain": "buildroot",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "base-to-profile",
+      "domain": "kernel",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "base-to-profile",
+      "domain": "busybox",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "base-to-profile",
+      "domain": "firmware",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "base-to-profile",
+      "domain": "cmdline",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "base-to-profile",
+      "domain": "rootfs",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    },
+    {
+      "comparison": "base-to-profile",
+      "domain": "image",
+      "status": "pending",
+      "detail": "Synthetic format example: this domain has not been resolved or compared."
+    }
+  ],
+  "checks": [
+    {
+      "id": "effective-configuration",
+      "phase": "configuration",
+      "status": "pending",
+      "detail": "This example includes representative requested changes only; it is not an accepted build plan."
+    },
+    {
+      "id": "static-core",
+      "phase": "artifact",
+      "status": "pending",
+      "detail": "No binaries have been built or checked for this example."
+    }
+  ],
+  "hardware": [],
+  "artifacts": []
+}

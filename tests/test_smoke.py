@@ -10,7 +10,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from src import cli, smoke, snapshots
+from src import cli
+from src.diagnostics import smoke
+from src.artifacts import snapshots
 from src.common import Context, UserError
 
 

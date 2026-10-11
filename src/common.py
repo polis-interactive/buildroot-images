@@ -17,16 +17,8 @@ class Context:
     snapshots: Path
 
     @property
-    def boards(self) -> list[str]:
-        return sorted(p.name.removesuffix("_defconfig")
-                      for p in (self.repo / "configs").glob("*_defconfig"))
-
-    def output(self, board: str, override: Path | None = None) -> Path:
-        return (override or self.repo / "output" / board).resolve()
-
-    def require_board(self, board: str) -> None:
-        if board not in self.boards:
-            raise UserError(f"Unknown board {board!r}. Use 'boards' to list choices.")
+    def profiles(self) -> list[str]:
+        return sorted(p.stem for p in (self.repo / "profiles").glob("*.toml"))
 
 
 def run(args, *, capture=False, cwd=None, env=None, input=None):

@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import unittest
 
-BOARD = Path(__file__).resolve().parents[1] / 'board/polis/rpi4'
+BOARD = Path(__file__).resolve().parents[1] / 'board/rpi4'
 
 
 class KernelEntryTest(unittest.TestCase):

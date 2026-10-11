@@ -1,7 +1,0 @@
-[[steps]]
-name = "firmware-tools"
-when = "BR2_PACKAGE_POLIS_FIRMWARE_TOOLS"
-targets = ["polis-firmware-tools-dirclean", "polis-firmware-tools"]
-inputs = ["package/polis-firmware-tools"]
-config = ["BR2_PACKAGE_POLIS_FIRMWARE_TOOLS*", "BR2_POLIS_PREFER_STATIC"]
-outputs = ["{output}/build/polis-firmware-tools-*/.stamp_built", "{output}/target/usr/bin/vclog", "{output}/target/usr/bin/vcgencmd"]

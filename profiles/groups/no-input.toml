@@ -1,0 +1,10 @@
+schema = 1
+id = "no-input"
+description = "Remove input and HID support."
+evidence = ["P04"]
+
+[kernel]
+"CONFIG_INPUT" = "n"
+"CONFIG_HID_SUPPORT" = "n"
+"CONFIG_RC_CORE" = "n"
+"CONFIG_AUXDISPLAY" = "n"

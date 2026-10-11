@@ -1,0 +1,24 @@
+#:schema ../profile.schema.json
+# Format example; executable selections live in profiles/.
+schema = 1
+name = "rpi4-speed"
+base = "polis-rpi4-v1" # musl + EROFS + enforced static core
+requires = ["boot-diagnostics", "uart-diagnostics", "usb-diagnostics", "wifi"]
+
+# Order is for readability, not precedence. No silent conflict overrides.
+groups = [
+  # Product features and measurement support.
+  "polis-runtime", "boot-diagnostics", "wifi-iwd",
+  "uart-diagnostics", "usb-diagnostics", "kernel-entry-marker",
+
+  # Explicit capability restrictions; these are not part of the base.
+  "headless", "no-ethernet", "bluetooth-uart-routing", "usb-peripheral-only",
+  "no-input", "no-32bit", "no-containers", "local-storage-only",
+
+  # Independently selectable optimizations; evidence remains in the runlog.
+  "kernel-size", "trim-debug-instrumentation", "no-cron",
+  "skip-hat-eeprom", "skip-poe-fan",
+  "lz4-kernel", "cutdown-firmware", "premerge-overlays", "boot-ramdisk",
+  "eeprom-no-net-install",
+]
+# EEPROM preparation is separate from image build execution.

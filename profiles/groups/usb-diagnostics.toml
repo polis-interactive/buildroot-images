@@ -1,0 +1,21 @@
+schema = 1
+id = "usb-diagnostics"
+description = "USB-C serial gadget and capture service."
+requires = ["polis-runtime", "usb-peripheral-only"]
+provides = ["usb-diagnostics"]
+firmware_overlays = ["dwc2,dr_mode=peripheral"]
+overlays = ["profiles/groups/usb-diagnostics/rootfs-overlay"]
+
+[kernel]
+"CONFIG_USB_SUPPORT" = "y"
+"CONFIG_USB_GADGET" = "y"
+"CONFIG_USB_DWC2" = "y"
+"CONFIG_USB_DWC2_PERIPHERAL" = "y"
+"CONFIG_USB_G_SERIAL" = "y"
+"CONFIG_USB_DWC3" = "n"
+"CONFIG_USB_CONFIGFS" = "n"
+"CONFIG_USB_ETH" = "n"
+"CONFIG_USB_MASS_STORAGE" = "n"
+
+[cmdline]
+"g_serial.iProduct" = "Polis_Pi_Diagnostics"

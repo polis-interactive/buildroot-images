@@ -30,8 +30,8 @@ pub const SD_DISK_ID_PATH: &str = "pci-0000:00:14.0-usb-0:2:1.0-scsi-0:0:0:0";
 pub const SD_DISK_SERIAL: &str = "1000000000e4bb49";
 // Official usbboot commit 861a703d8b51f42b76bcdff49da3e0f2766966bf.
 // Paths are relative to the repository, resolved below before use.
-pub const GADGET_DIR: &str = "local/polis-recovery/gadget";
-pub const GADGET_SHA256: &str = "a41a8f03f22d78dd873903ea92056b302e6e879cf003f1f2ec8d4f6dd354dd2d";
+pub const GADGET_DIR: &str = "local/polis-wired-tools/gadget";
+pub const GADGET_SHA256: &str = include_str!("../../recovery/payload.sha256");
 pub const RPIBOOT: &str = "local/usbboot/rpiboot";
 // Explicit known-good image (path relative to repository); never auto-select.
 // Normal boot/USB and recovery write/readback verified on this bench.
@@ -60,7 +60,7 @@ pub fn fixture() -> Config {
         disk_id_path: SD_DISK_ID_PATH.into(),
         disk_serial: SD_DISK_SERIAL.into(),
         gadget_dir: repo_root.join(GADGET_DIR),
-        gadget_sha256: GADGET_SHA256.into(),
+        gadget_sha256: GADGET_SHA256.trim().into(),
         rpiboot: repo_root.join(RPIBOOT),
         repo_root,
         socket: state_dir.join(SOCKET_NAME),

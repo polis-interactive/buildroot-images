@@ -1,0 +1,6 @@
+schema = 1
+id = "skip-hat-eeprom"
+description = "Skip HAT EEPROM probing on boards without HATs."
+
+[firmware]
+"force_eeprom_read" = "0"

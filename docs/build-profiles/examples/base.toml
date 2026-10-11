@@ -1,0 +1,22 @@
+#:schema ../base-v1.schema.json
+# Format example: implemented base groups live in profiles/groups/.
+schema = 1
+name = "polis-rpi4-v1"
+groups = ["musl-toolchain", "erofs-root", "static-core"]
+
+[upstream]
+buildroot = "2026.08"
+defconfig = "raspberrypi4_64_defconfig"
+# Resolution records actual input/source hashes, including local modifications.
+
+[static_core]
+required = ["bin/busybox"]
+# Enforce when the owning package is selected, not merely when a file exists.
+when_selected = [
+  "usr/libexec/iwd",
+  "usr/bin/dbus-daemon", "usr/bin/dbus-uuidgen",
+  "usr/bin/kmod",
+  "usr/bin/xz", "usr/bin/xzdec", "usr/bin/lzmadec", "usr/bin/lzmainfo",
+  "usr/bin/polis-boot-diagnostics", "usr/bin/vclog", "usr/bin/vcgencmd",
+]
+allow_other_dynamic_executables = true

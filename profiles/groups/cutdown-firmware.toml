@@ -1,0 +1,13 @@
+schema = 1
+id = "cutdown-firmware"
+description = "Cut-down Pi 4 firmware selected by gpu_mem=16; firmware codecs, 3D and debug logging are unavailable."
+requires = ["headless"]
+evidence = ["P06"]
+remove_firmware = ["start_file", "fixup_file"]
+
+[buildroot]
+BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI4 = "n"
+BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI4_CD = "y"
+
+[firmware]
+gpu_mem = "16"

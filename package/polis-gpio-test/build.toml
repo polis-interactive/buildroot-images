@@ -1,8 +1,0 @@
-[[steps]]
-name = "gpio-probe"
-when = "BR2_PACKAGE_POLIS_GPIO_TEST"
-# Re-extract changed local sources so removed/renamed files cannot survive rsync.
-targets = ["polis-gpio-test-dirclean", "polis-gpio-test"]
-inputs = ["package/polis-gpio-test"]
-config = ["BR2_PACKAGE_POLIS_GPIO_TEST*", "BR2_PACKAGE_HOST_RUSTC*", "BR2_POLIS_PREFER_STATIC"]
-outputs = ["{output}/build/polis-gpio-test-*/.stamp_built", "{output}/target/usr/bin/polis-gpio-test", "{output}/target/etc/init.d/polis-gpio-test"]

@@ -1,0 +1,19 @@
+schema = 1
+id = "local-storage-only"
+description = "Direct SD root; remove alternate storage and network-root support."
+evidence = ["P04"]
+
+[kernel]
+"CONFIG_BLK_DEV_INITRD" = "n"
+"CONFIG_BLK_DEV_RAM" = "n"
+"CONFIG_NETWORK_FILESYSTEMS" = "n"
+"CONFIG_F2FS_FS" = "n"
+"CONFIG_AUTOFS_FS" = "n"
+# Upstream OCFS2 selects QUOTA=y. Preserve the
+# measured configuration instead of repeating the ineffective original n.
+"CONFIG_QUOTA" = "y"
+"CONFIG_PCI" = "n"
+"CONFIG_SCSI" = "n"
+"CONFIG_ATA" = "n"
+"CONFIG_MD" = "n"
+"CONFIG_BLK_DEV_NVME" = "n"

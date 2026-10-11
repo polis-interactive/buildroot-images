@@ -1,5 +1,8 @@
 # Cold-boot benchmarks and USB log retrieval
 
+Optimization results, signed timing changes and interaction hypotheses are kept
+in the persistent [pre-Linux runlog](prelinux-runlog.md).
+
 From the repository root, with the daemon running:
 
 ```sh
@@ -89,7 +92,7 @@ TTY, and rejects stale IDs, unknown or duplicate files, corrupt data, oversized
 streams, missing trailers and disconnects. Only harmless startup pings and
 explicit capture-BUSY replies are retried within the deadline.
 
-Verified files are imported through `src/bootbench.py` into
+Verified files are imported through `src/diagnostics/bootbench.py` into
 `local/polis-wired-state/captures/<boot UUID>/`. `capture.json` records hashes,
 import time and separate firmware/Linux metrics. Existing UUIDs cannot be
 overwritten with different content. Firmware `arm_s` is the firmware's ARM

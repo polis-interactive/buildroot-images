@@ -1,0 +1,5 @@
+config BR2_PACKAGE_HOST_POLIS_DTMERGE
+	bool "host polis-dtmerge"
+	help
+	  Raspberry Pi's dtmerge utility for applying firmware overlays on
+	  the build host. Installs no utilities into the target image.

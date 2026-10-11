@@ -14,11 +14,11 @@ import time
 import unittest
 
 from src.common import UserError, read_config
-from src.wired_usb import discover, ping
+from src.wired.usb import discover, ping
 
 
 REPO = Path(__file__).resolve().parents[1]
-BOARD = REPO / 'board/polis/rpi4'
+BOARD = REPO / 'board/rpi4'
 
 
 class WiredUsbTest(unittest.TestCase):
@@ -135,7 +135,7 @@ class WiredUsbTest(unittest.TestCase):
             'sys.exit(result.returncode)\n'
         )
         stty.chmod(0o755)
-        script = (BOARD / 'rootfs-overlay/usr/libexec/polis-usb-diagnostic').read_text()
+        script = (REPO / 'profiles/groups/usb-diagnostics/rootfs-overlay/usr/libexec/polis-usb-diagnostic').read_text()
         script = script.replace('/dev/ttyGS0', os.ttyname(slave)).replace('sleep 1', 'sleep 0')
         process = subprocess.Popen(['sh', '-c', script], stderr=subprocess.PIPE,
                                    env={**os.environ, 'PATH': fixture.name + os.pathsep + os.environ['PATH']})
@@ -181,17 +181,11 @@ class WiredUsbTest(unittest.TestCase):
             self.assertIn('/etc/init.d/mount-data && /usr/libexec/polis-smoke-rcS', inittab.read_text())
             self.assertTrue(os.access(service, os.X_OK))
 
-    def test_every_polis_profile_ships_diagnostics_without_card_edits(self):
-        for profile in (REPO / 'configs').glob('polis_*_defconfig'):
-            with self.subTest(profile=profile.name):
-                config = read_config(profile)
-
-                def source(symbol):
-                    return Path(config[symbol].replace('$(BR2_EXTERNAL_POLIS_PATH)', str(REPO)))
-
-                args = source('BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE').read_text().split()
-                self.assertIn('console=ttyAMA0,115200', args)
-                self.assertIn('polis.smoke=1', args)
-                self.assertIn('g_serial.iProduct=Polis_Pi_Diagnostics', args)
-                self.assertIn('dtoverlay=dwc2,dr_mode=peripheral', source('BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE').read_text())
-                self.assertIn('board/polis/rpi4/linux.fragment', config['BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES'])
+    def test_usb_diagnostic_group_owns_the_service_and_kernel_support(self):
+        import tomllib
+        group = tomllib.loads((REPO / 'profiles/groups/usb-diagnostics.toml').read_text())
+        self.assertIn('g_serial.iProduct', group['cmdline'])
+        self.assertEqual(group['kernel']['CONFIG_USB_G_SERIAL'], 'y')
+        overlays = group['overlays']
+        self.assertTrue(any((REPO / path / 'usr/libexec/polis-usb-diagnostic').is_file()
+                            for path in overlays))

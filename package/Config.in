@@ -1,5 +1,13 @@
-source "$BR2_EXTERNAL_POLIS_PATH/package/polis-gpio-test/Config.in"
-source "$BR2_EXTERNAL_POLIS_PATH/package/polis-firmware-tools/Config.in"
+source "$BR2_EXTERNAL_POLIS_PATH/package/polis-boot-diagnostics/Config.in"
+source "$BR2_EXTERNAL_POLIS_PATH/package/polis-dtmerge/Config.in.host"
+
+config BR2_POLIS_KERNEL_ENTRY
+	bool "Emit the Polis Linux entry benchmark marker"
+	depends on BR2_aarch64
+	depends on BR2_LINUX_KERNEL
+	help
+	  Instrument Linux entry for the Pico UART benchmark. Profile builds
+	  select this explicitly through the kernel-entry-marker group.
 
 config BR2_POLIS_PREFER_STATIC
 	bool "Prefer static executables in the Polis image"

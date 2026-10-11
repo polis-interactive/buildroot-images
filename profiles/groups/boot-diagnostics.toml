@@ -1,0 +1,11 @@
+schema = 1
+id = "boot-diagnostics"
+description = "Collect immutable kernel and firmware boot diagnostics."
+requires = ["polis-runtime"]
+provides = ["boot-diagnostics"]
+post_build = ["package/polis-boot-diagnostics/install.py"]
+inputs = ["package/polis-boot-diagnostics"]
+
+[buildroot]
+"BR2_PACKAGE_POLIS_BOOT_DIAGNOSTICS" = "y"
+

@@ -1,7 +1,7 @@
 [project]
 name = "buildrootimages"
 version = "0.1.0"
-description = "Explicit board selection, builds, snapshots, and SD-card flashing for Polis"
+description = "Declarative build profiles, snapshots, and SD-card flashing for Polis"
 requires-python = ">=3.12"
 dependencies = []
 

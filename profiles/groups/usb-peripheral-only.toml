@@ -1,0 +1,13 @@
+schema = 1
+id = "usb-peripheral-only"
+description = "Remove USB host and input drivers that select it."
+
+[kernel]
+"CONFIG_JOYSTICK_XPAD" = "n"
+"CONFIG_TOUCHSCREEN_USB_COMPOSITE" = "n"
+"CONFIG_INPUT_ATI_REMOTE2" = "n"
+"CONFIG_INPUT_KEYSPAN_REMOTE" = "n"
+"CONFIG_INPUT_POWERMATE" = "n"
+"CONFIG_INPUT_YEALINK" = "n"
+"CONFIG_INPUT_CM109" = "n"
+"CONFIG_USB" = "n"

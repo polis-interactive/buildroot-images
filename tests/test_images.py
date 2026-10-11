@@ -12,7 +12,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from src import cli, images
+from src import cli
+from src.artifacts import images
 from src.common import Context, UserError, run
 
 
@@ -101,7 +102,7 @@ class ExpansionTest(unittest.TestCase):
                 ('shutil.which', dict(return_value=None)),
                 ('data_layout', dict(side_effect=UserError('unsupported layout'))),
                 ('check_data_filesystem', dict(side_effect=UserError('wrong filesystem')))):
-            with self.subTest(target=target), patch('src.images.' + target, **kwargs):
+            with self.subTest(target=target), patch('src.artifacts.images.' + target, **kwargs):
                 with self.assertRaises(UserError):
                     images.flash(self.ctx, self.image, self.device, expand_data=True)
                 command.assert_not_called()

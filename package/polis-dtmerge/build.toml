@@ -1,0 +1,7 @@
+[[steps]]
+name = "host-dtmerge"
+when = "BR2_PACKAGE_HOST_POLIS_DTMERGE"
+targets = ["host-polis-dtmerge-dirclean", "host-polis-dtmerge"]
+inputs = ["package/polis-dtmerge", "{buildroot}/package/dtc"]
+config = ["BR2_PACKAGE_HOST_POLIS_DTMERGE"]
+outputs = ["{output}/build/host-polis-dtmerge-*/.stamp_built", "{output}/host/bin/dtmerge"]

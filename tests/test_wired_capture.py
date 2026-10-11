@@ -12,14 +12,14 @@ import time
 import unittest
 
 from src.common import UserError
-from src.wired_capture import capture, receive, Wire
+from src.wired.capture import capture, receive, Wire
 
 BOOT = '12345678-abcd-1234-abcd-123456789abc'
 NONCE = 'a'*32
 REPO = Path(__file__).resolve().parents[1]
 
 
-def file_lines(name='gpio.log', data=b'POLIS_GPIO_READY uptime=1.25\n'):
+def file_lines(name='boot.log', data=b'POLIS_BOOT_DIAGNOSTICS_START uptime=1.25\n'):
     return [f'FILE {name} {len(data)} {hashlib.sha256(data).hexdigest()}',
             base64.b64encode(data).decode(), 'END_FILE']
 
@@ -39,10 +39,17 @@ class CaptureTest(unittest.TestCase):
             first = receive(Lines(lines), NONCE, BOOT, archive)
             again = receive(Lines(lines), NONCE, BOOT, archive)
             self.assertEqual(first, again)
-            self.assertEqual(first['capture']['metrics']['linux_ready_s'], 1.25)
+            self.assertIsNone(first['capture']['metrics']['linux_ready_s'])
             bad = file_lines(data=b'changed') + [f'POLIS_CAPTURE_END {NONCE} {BOOT}']
             with self.assertRaisesRegex(UserError, 'changed'):
                 receive(Lines(bad), NONCE, BOOT, archive)
+
+    def test_old_image_gpio_capture_remains_readable(self):
+        with tempfile.TemporaryDirectory() as temp:
+            lines = file_lines('gpio.log', b'POLIS_GPIO_READY uptime=1.25\n')
+            lines += [f'POLIS_CAPTURE_END {NONCE} {BOOT}']
+            result = receive(Lines(lines), NONCE, BOOT, Path(temp))
+            self.assertEqual(result['capture']['metrics']['linux_ready_s'], 1.25)
 
     def test_corruption_truncation_traversal_duplicates_and_stale_trailer_fail(self):
         valid = file_lines()
@@ -101,11 +108,11 @@ class CaptureTest(unittest.TestCase):
                 logs = root/'boot-diagnostics'/BOOT
                 logs.mkdir(parents=True)
                 data = b'hello\x00\xff\n'
-                (logs/'gpio.log').write_bytes(data)
+                (logs/'boot.log').write_bytes(data)
                 (logs/'firmware.log').write_text('100.000: arm_loader: Starting ARM\n')
                 (logs/'not-exported.txt').write_text('not part of protocol')
                 (logs/'cmdline.txt').symlink_to('/etc/passwd')
-                script = (REPO/'board/polis/rpi4/rootfs-overlay/usr/libexec/polis-usb-diagnostic').read_text()
+                script = (REPO/'profiles/groups/usb-diagnostics/rootfs-overlay/usr/libexec/polis-usb-diagnostic').read_text()
                 script = script.replace('/dev/ttyGS0',os.ttyname(slave)).replace('sleep 1','sleep 0')
                 script = script.replace('/proc/sys/kernel/random/boot_id',str(root/'id')).replace('/data/boot-diagnostics',str(root/'boot-diagnostics'))
                 process = subprocess.Popen(['sh','-c',script],stderr=subprocess.PIPE)
@@ -116,7 +123,7 @@ class CaptureTest(unittest.TestCase):
                     self.assertEqual(wire.line(),f'POLIS_CAPTURE_BEGIN {NONCE} {BOOT}')
                     result = receive(wire,NONCE,BOOT,root/'archive')
                     saved = Path(result['path'])
-                    self.assertEqual((saved/'gpio.log').read_bytes(),data)
+                    self.assertEqual((saved/'boot.log').read_bytes(),data)
                     self.assertFalse((saved/'cmdline.txt').exists())
                     self.assertFalse((saved/'not-exported.txt').exists())
                 finally:

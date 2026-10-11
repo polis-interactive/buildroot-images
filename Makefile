@@ -7,10 +7,11 @@ PICOTOOL ?= picotool
 WIRED_FIXTURE ?= bench-rpi4b
 WIRED_SOCKET ?= $(CURDIR)/local/polis-wired-state/daemon.sock
 PICO_SERIAL ?=
+WIRED_USER ?= $(shell id -un)
 shell_quote = '$(subst ','"'"',$(1))'
 
-COMMANDS := boards configure build menuconfig savedefconfig \
-	linux-reconfigure busybox-reconfigure images devices flash snapshot smoke
+COMMANDS := profiles configure build image audit prepare-eeprom \
+	images devices flash snapshot smoke
 WIRED_COMMANDS := wired-flash wired-daemon wired-usb-test wired-cli wired-diagnostics wired-benchmark
 HELP_GOALS := help -h --help
 COMMAND_HELP := $(filter $(HELP_GOALS),$(MAKECMDGOALS))
@@ -35,10 +36,16 @@ $(FIRST_GOAL):
 $(filter-out $(FIRST_GOAL),$(FORWARDED_ARGS)):
 	@:
 else
-.PHONY: $(HELP_GOALS) setup test clean purge $(WIRED_COMMANDS) $(COMMANDS)
+.PHONY: $(HELP_GOALS) setup setup-permissions test clean purge $(WIRED_COMMANDS) $(COMMANDS)
 
 $(HELP_GOALS):
 ifeq ($(filter $(COMMANDS) $(WIRED_COMMANDS),$(MAKECMDGOALS)),)
+	@printf '%s\n' 'Maintenance commands:' \
+		'  make setup        Install Python dependencies, pinned usbboot tools, and RAM recovery payload' \
+		'  make setup-permissions  Install host udev rules and enroll WIRED_USER via sudo' \
+		'  make test         Run host tests' \
+		'  make clean        Delete .cache/ and dl/ (downloads will be fetched again)' \
+		'  make purge        Delete output/, local/usbboot/, local/polis-wired-tools/ (restore tools with make setup)' ''
 	@printf '%s\n' 'Wired-control commands:' \
 		'  make wired-flash   Build, flash, verify, and start Pico firmware using picotool' \
 		'  make wired-daemon  Build and run the host daemon in the foreground' \
@@ -70,11 +77,11 @@ endif
 wired-usb-test:
 ifneq ($(strip $(WIRED_HELP)),)
 	@printf '%s\n' 'Usage: make wired-usb-test' \
-		'Ping the rebuilt polis_* image over its direct Pi USB-C diagnostic endpoint.' \
+		'Ping a profile with USB diagnostics over its direct Pi USB-C diagnostic endpoint.' \
 		'Requires exactly one device with USB product Polis_Pi_Diagnostics; never selects the Pico.' \
 		'Does not change power, flash storage, or provision OTP.'
 else
-	@$(UV) run python -m src.wired_usb
+	@$(UV) run python -m src.wired.usb
 endif
 
 wired-cli wired-diagnostics wired-benchmark:
@@ -83,7 +90,7 @@ ifneq ($(strip $(WIRED_HELP)),)
 		'       make wired-diagnostics' \
 		'       make wired-benchmark [ARGS="--samples 3"]' \
 		'Diagnostics reads the current boot capture. Benchmark cycles power (default: 5 boots); it never flashes.' \
-		'Requires the running daemon, schema-3 Pico firmware, and rebuilt Pi base image for benchmarks.' \
+		'Requires the running daemon, schema-3 Pico firmware, and rebuilt diagnostic profile for benchmarks.' \
 		'Status reports progress and artifact paths. Never replay a benchmark after an ambiguous reply.'
 else
 	cd package/polis-wired-control && $(CARGO) build --locked --target-dir target -p polis-wired
@@ -103,15 +110,36 @@ else
 endif
 
 setup:
+ifneq ($(strip $(COMMAND_HELP) $(filter $(HELP_GOALS),$(ARGS))),)
+	@printf '%s\n' 'Usage: make setup [UV=/path/to/uv]' \
+		'Install Python dependencies, download pinned usbboot/rpi-eeprom into local/usbboot/, and build rpiboot.' \
+		'Prepare the verified RAM recovery payload in local/polis-wired-tools/gadget/.' \
+		'Requires Git, Make, a C compiler, pkg-config, and libusb development files.' \
+		'Existing clean checkouts at the pinned revisions are reused. No hardware is accessed.'
+else
 	@$(UV) sync
+	@$(UV) run python -m src.setup.usbboot
+	@$(UV) run python -m src.setup.recovery
+endif
+
+setup-permissions:
+ifneq ($(strip $(COMMAND_HELP) $(filter $(HELP_GOALS),$(ARGS))),)
+	@printf '%s\n' 'Usage: make setup-permissions [WIRED_USER=account]' \
+		'Use sudo to install tracked udev rules and add the selected account to polis-wired.' \
+		'WIRED_USER defaults to the user invoking make. Matching devices are accessible on any USB port.' \
+		'Previous Polis rules are backed up and disabled. Rules apply when devices reconnect.' \
+		'Daemon fixture identity checks remain required. Docs: package/polis-wired-control/docs/host.md'
+else
+	@sudo python3 -m src.setup.permissions --user $(call shell_quote,$(WIRED_USER))
+endif
 
 test:
 	@$(UV) run python -m unittest discover -s tests -p 'test_*.py'
 
 clean:
-	@rm -rf -- .cache
+	@rm -rf -- .cache dl
 
 purge:
-	@rm -rf -- output
+	@rm -rf -- output local/usbboot local/polis-wired-tools
 	@mkdir -p output
 endif

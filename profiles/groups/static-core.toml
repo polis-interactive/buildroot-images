@@ -1,0 +1,13 @@
+schema = 1
+id = "static-core"
+description = "Enforce static core executables while retaining shared-library support."
+requires = ["musl-toolchain"]
+post_build = ["board/rpi4/check-static.py"]
+inputs = ["build-support/static-core", "patches/musl/kmod"]
+
+[buildroot]
+"BR2_SHARED_STATIC_LIBS" = "y"
+"BR2_POLIS_PREFER_STATIC" = "y"
+
+[busybox]
+"CONFIG_STATIC" = "y"

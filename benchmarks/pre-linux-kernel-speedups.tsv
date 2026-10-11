@@ -1,0 +1,16 @@
+experiment    	boots	median_s	fastest_s	slowest_s	delta_s	description                                                	result
+Baseline      	5    	7.330   	7.274    	7.396    	       	Original qualification                                     	Saved reference
+Gzip baseline 	8    	7.379   	7.294    	10.878   	       	Uncompressed kernel; before and after gzip test            	Slow boot retained; used for gzip comparison
+P01           	8    	7.418   	7.333    	7.516    	+0.039 	Gzip-compressed kernel; same decompressed bytes            	No demonstrated benefit; reverted; full timing affected by drift
+Saved baseline	5    	7.350   	7.304    	7.389    	       	Uncompressed kernel; reference for subsequent experiments  	Reuse these results; no routine baseline reruns
+P02           	5    	7.365   	7.311    	10.916   	+0.016 	Skip LCD detection: ignore_lcd=1                           	No measurable effect; consistent with baseline variation
+P03           	5    	7.278   	7.246    	7.312    	-0.071 	Disable firmware framebuffers: max_framebuffers=0          	No measurable effect; consistent with baseline variation
+P04           	5    	6.379   	6.324    	9.924    	-0.971 	Smaller kernel: optimize for size; remove unused subsystems	0.971 s faster vs saved baseline; keep; slow boot retained
+P05           	5    	6.001   	5.901    	9.493    	-1.349 	P04 kernel compressed with LZ4; ARM CPU decompresses       	0.378 s faster than P04; keep; slow boot retained
+P06           	5    	5.852   	5.804    	5.885    	-1.498 	P05 plus cut-down firmware; gpu_mem=16                     	Selected in polis-rpi4-speed (P09); historical gain 0.149 s vs P05
+P07           	5    	5.750   	5.715    	5.809    	-1.600 	P06 plus pre-applied UART/Bluetooth and USB overlays       	0.102 s lower vs P06; benefit unconfirmed; retain provisionally
+P08           	5    	4.624   	4.574    	4.626    	-2.725 	P07 plus EEPROM: disable network-installer keyboard scan   	1.126 s faster than P07; clear improvement; keep
+P09           	5    	4.317   	4.276    	4.343    	-3.033 	P08 plus compact boot filesystem loaded into RAM           	0.308 s faster than P08; keep; same kernel and firmware
+P10           	5    	4.303   	4.217    	7.916    	-3.047 	P09 with ARM64 BCJ + Zstd; RAM boot image 6 to 5 MiB       	No measurable gain vs P09 (-0.014 s); revert; slow boot retained
+P11           	5    	4.260   	4.170    	4.357    	-3.090 	P09 with Pi4-only kernel; ext4/VFAT modules; 5.25 MiB boot 	No demonstrated gain vs P09 (-0.057 s); revert kernel profile
+P12           	5    	4.344   	4.288    	4.374    	-3.006 	P09 with outer FAT clusters increased from 2 to 16 KiB     	No measurable effect vs P09 (+0.027 s); revert

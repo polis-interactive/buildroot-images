@@ -1,0 +1,16 @@
+schema = 1
+id = "uart-diagnostics"
+description = "PL011 diagnostics on GPIO14/15."
+requires = ["bluetooth-uart-routing"]
+provides = ["uart-diagnostics"]
+
+[kernel]
+"CONFIG_SERIAL_AMBA_PL011" = "y"
+"CONFIG_SERIAL_AMBA_PL011_CONSOLE" = "y"
+"CONFIG_NULL_TTY" = "y"
+
+[firmware]
+"enable_uart" = "1"
+
+[cmdline]
+"console" = "ttyAMA0,115200"
