@@ -22,7 +22,7 @@ that setting on the commissioned `bench-rpi4b` with firmware release
 Unfamiliar firmware/configurations fail explicitly.
 
 Preparation uses the profile's built images and the latest imported diagnostics
-under `local/polis-sbc-controller-state/captures`. Capture file hashes are checked. Supply
+under `.local/polis-sbc-controller-state/captures`. Capture file hashes are checked. Supply
 `--capture DIRECTORY` on `image` or `prepare-eeprom` to choose a saved capture.
 Use `make sbc-controller-diagnostics` to collect one from the running commissioned fixture.
 Preparation itself never accesses hardware.
@@ -34,7 +34,7 @@ make prepare-eeprom ARGS="--profile polis-rpi4-speed --capture CAPTURE --base-im
 ```
 
 Without those overrides, preparation is recorded in the build audit and selected
-bundle under `output/<profile>-<hash>/eeprom/`. The automatic snapshot includes
+bundle under `.output/<profile>-<hash>/eeprom/`. The automatic snapshot includes
 that bundle and its captured evidence. If the saved configuration already
 matches, it records `matches-saved-capture` and creates no update image. This is
 not a claim about the board's current state.
@@ -45,7 +45,7 @@ settings, firmware hash, image hashes and timestamp. `before.conf` and
 firmware, not a physical EEPROM dump. The backend checks executable firmware
 sections and permits only updater files to change on the temporary boot FAT.
 The normal SD image is unchanged. The pinned tools live in
-`local/usbboot/rpi-eeprom`, downloaded by `make setup`; `mcopy` comes from the
+`.local/usbboot/rpi-eeprom`, downloaded by `make setup`; `mcopy` comes from the
 profile's host tools or PATH. Rerun `make setup` if the tool checkout was removed.
 
 ## Apply a prepared update

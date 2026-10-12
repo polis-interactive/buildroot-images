@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+[ "${1:-}" = start ] || exit 0
+# mount-data must already have mounted the ext4 partition and /var/lib.
+awk '$2 == "/data" && $3 == "ext4" { found=1 } END { exit !found }' /proc/mounts
+umask 077
+mkdir -p /data/config/ssh /data/config/dropbear /data/bin /data/log /var/lib/iwd /var/lib/dbus
+chmod 700 /data/config/ssh /data/config/dropbear /var/lib/iwd
+# Preserve locally updated authorization across reboots and binary uploads.
+if [ ! -e /data/config/ssh/authorized_keys ]; then
+    cp /usr/share/polis-development/authorized_keys /data/config/ssh/authorized_keys
+fi
+chmod 600 /data/config/ssh/authorized_keys

@@ -19,7 +19,8 @@ def parser() -> argparse.ArgumentParser:
     common.add_argument("--buildroot", type=Path,
                         default=Path("/home/broosegoose/Software/buildroot-2026.08"))
     common.add_argument("--downloads", type=Path, help="download cache (default: BUILDROOT/dl)")
-    common.add_argument("--snapshots", type=Path, default=REPO / "snapshots")
+    common.add_argument("--snapshots", type=Path, default=REPO / ".snapshots",
+                        help="snapshot directory (default: repository .snapshots/)")
     commands = result.add_subparsers(dest="command")
     commands.add_parser("profiles", help="list available TOML profiles", parents=[common])
     profile_actions = {
@@ -32,7 +33,10 @@ def parser() -> argparse.ArgumentParser:
     for action, description in profile_actions.items():
         command = commands.add_parser(action, parents=[common], help=description)
         command.add_argument('--profile', help='TOML profile name')
-        command.add_argument('--output', type=Path, help='override the profile output directory')
+        command.add_argument('--output', type=Path,
+                             help='override the profile output directory (default: repository .output/<profile>-<input-hash>/)')
+        command.add_argument('--ssh-public-key', type=Path,
+                             help='development-access public key (default: create/reuse .local/development-ssh/id_ed25519)')
         command.add_argument('--development', action='store_true',
                              help='use an isolated development build without first-boot EEPROM setup or /data expansion')
         if action == 'image':
@@ -92,7 +96,7 @@ def main(argv=None) -> int:
             if profile is not None:
                 if profile not in ctx.profiles:
                     raise UserError(f"Unknown profile {profile!r}. Use 'profiles' to list choices.")
-                options = dict(development=args.development)
+                options = dict(development=args.development, ssh_public_key=args.ssh_public_key)
                 if args.command == 'image':
                     options['capture'] = args.capture
                 profile_workflow.execute(ctx, args.command, profile, args.output, getattr(args, 'name', None), **options)

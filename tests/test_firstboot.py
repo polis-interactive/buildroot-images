@@ -305,7 +305,7 @@ class FirstbootTests(unittest.TestCase):
         self.assertEqual(kept, payload.read_bytes())
 
     def test_upstream_tool_roundtrip_and_rollback_timestamp(self):
-        source = REPO / 'local/usbboot/rpi-eeprom'
+        source = REPO / '.local/usbboot/rpi-eeprom'
         if not (source / 'rpi-eeprom-config').exists():
             self.skipTest('optional pinned upstream checkout unavailable')
         assets = self.root / 'assets'

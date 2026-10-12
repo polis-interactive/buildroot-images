@@ -56,8 +56,8 @@ class IncrementalTest(unittest.TestCase):
         self.source.write_text('original')
         (self.repo / 'consumer').write_text('consumer')
         (self.repo / 'overlay').mkdir()
-        self.ctx = Context(self.repo, self.br, self.br / 'dl', self.repo / 'snapshots')
-        self.output = self.repo / 'output/test'
+        self.ctx = Context(self.repo, self.br, self.br / 'dl', self.repo / '.snapshots')
+        self.output = self.repo / '.output/test'
         self.commands = []
         # Isolate incremental execution; reviewed-plan validation has its own tests.
         self.enterContext(patch.object(builds, 'assert_current'))
@@ -79,6 +79,7 @@ class IncrementalTest(unittest.TestCase):
                                      + self.defconfig.read_bytes()).hexdigest()
         return SimpleNamespace(profile=SimpleNamespace(name='test', base=Base.POLIS_RPI4_V1),
                                fingerprint=fingerprint, inputs=[], groups={}, changes=[], development=False,
+                               ssh_public_key='',
                                values={'kernel': {}, 'busybox': {}, 'eeprom': {}})
 
     def build(self):

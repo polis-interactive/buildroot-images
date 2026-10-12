@@ -1,0 +1,40 @@
+schema = 1
+id = "development-access"
+description = "Development-only Ethernet DHCP, key-only SSH, diagnostics and writable application service."
+requires = ["wifi-iwd"]
+provides = ["ethernet", "development-ssh"]
+overlays = ["profiles/groups/development-access/rootfs-overlay"]
+post_build = ["board/rpi4/install-development.py"]
+inputs = ["profiles/groups/development-access/dropbear-localoptions.h"]
+
+[buildroot]
+"BR2_TARGET_GENERIC_HOSTNAME" = "polis-dev"
+"BR2_TARGET_GENERIC_ISSUE" = "Polis Raspberry Pi 4 development image"
+"BR2_LINUX_KERNEL_INTREE_DTS_NAME" = "broadcom/bcm2711-rpi-4-b"
+"BR2_PACKAGE_DBUS" = "y"
+"BR2_PACKAGE_READLINE" = "y"
+"BR2_PACKAGE_AVAHI" = "y"
+"BR2_PACKAGE_AVAHI_DAEMON" = "y"
+"BR2_PACKAGE_AVAHI_AUTOIPD" = "n"
+"BR2_PACKAGE_DROPBEAR" = "y"
+"BR2_PACKAGE_DROPBEAR_CLIENT" = "n"
+"BR2_PACKAGE_DROPBEAR_DISABLE_REVERSEDNS" = "y"
+"BR2_PACKAGE_DROPBEAR_LOCALOPTIONS_FILE" = "$(BR2_EXTERNAL_POLIS_PATH)/profiles/groups/development-access/dropbear-localoptions.h"
+"BR2_TARGET_ENABLE_ROOT_LOGIN" = "y"
+"BR2_TARGET_GENERIC_ROOT_PASSWD" = ""
+"BR2_TARGET_GENERIC_GETTY" = "n"
+
+[kernel]
+"CONFIG_NETDEVICES" = "y"
+"CONFIG_ETHERNET" = "y"
+"CONFIG_NET_VENDOR_BROADCOM" = "y"
+"CONFIG_BCMGENET" = "y"
+"CONFIG_PHYLIB" = "y"
+"CONFIG_BROADCOM_PHY" = "y"
+
+[busybox]
+"CONFIG_SYSLOGD" = "y"
+"CONFIG_FEATURE_ROTATE_LOGFILE" = "y"
+"CONFIG_START_STOP_DAEMON" = "y"
+"CONFIG_FEATURE_START_STOP_DAEMON_FANCY" = "y"
+"CONFIG_FEATURE_START_STOP_DAEMON_LONG_OPTIONS" = "y"

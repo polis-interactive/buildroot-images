@@ -24,10 +24,20 @@
     "provisioning": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "mode"],
+      "required": [
+        "enabled",
+        "mode"
+      ],
       "properties": {
-        "enabled": {"type": "boolean"},
-        "mode": {"enum": ["final", "development"]}
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": [
+            "final",
+            "development"
+          ]
+        }
       }
     },
     "schema": {
@@ -207,6 +217,7 @@
             "polis-runtime",
             "boot-diagnostics",
             "wifi-iwd",
+            "development-access",
             "uart-diagnostics",
             "usb-diagnostics",
             "kernel-entry-marker",
@@ -302,6 +313,7 @@
               "polis-runtime",
               "boot-diagnostics",
               "wifi-iwd",
+              "development-access",
               "uart-diagnostics",
               "usb-diagnostics",
               "kernel-entry-marker",

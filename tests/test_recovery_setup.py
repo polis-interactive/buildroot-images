@@ -17,7 +17,7 @@ class RecoverySetupTests(unittest.TestCase):
         self.repo = Path(temporary.name)
         source = self.repo / 'package/polis-sbc-controller/recovery'
         source.mkdir(parents=True)
-        self.upstream = self.repo / 'local/usbboot/mass-storage-gadget64'
+        self.upstream = self.repo / '.local/usbboot/mass-storage-gadget64'
         self.upstream.mkdir(parents=True)
         (source / 'config.txt').write_text('boot_ramdisk=1\nuart_2ndstage=1\n')
         (self.upstream / 'boot.img').write_bytes(b'RAM environment')
@@ -30,13 +30,13 @@ class RecoverySetupTests(unittest.TestCase):
         (self.upstream / 'config.txt').write_bytes((source / 'config.txt').read_bytes())
         self.expected = payload_hash(self.upstream)
         (source / 'payload.sha256').write_text(self.expected + '\n')
-        self.target = self.repo / 'local/polis-sbc-controller-tools/gadget'
+        self.target = self.repo / '.local/polis-sbc-controller-tools/gadget'
 
     def test_fresh_setup_and_reuse_without_old_recovery_directory(self):
         recovery.install(self.repo)
         self.assertEqual(payload_hash(self.target), self.expected)
         self.assertFalse((self.target / 'bootfiles.bin').is_symlink())
-        self.assertFalse((self.repo / 'local/polis-recovery').exists())
+        self.assertFalse((self.repo / '.local/polis-recovery').exists())
         self.upstream.rename(self.upstream.with_name('unavailable'))
         recovery.install(self.repo)
         self.assertEqual(payload_hash(self.target), self.expected)

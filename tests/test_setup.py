@@ -36,7 +36,7 @@ class UsbbootSetupTests(unittest.TestCase):
         self.commit(self.source)
         self.options = dict(url=str(self.source), revision=self.head(self.source),
                             eeprom_revision=self.head(self.eeprom))
-        self.target = self.repo / 'local/usbboot'
+        self.target = self.repo / '.local/usbboot'
 
     def git(self, *args):
         return subprocess.check_output(['git', *args], text=True, stderr=subprocess.DEVNULL).strip()
@@ -87,4 +87,4 @@ class UsbbootSetupTests(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             self.install()
         self.assertFalse(self.target.exists())
-        self.assertEqual([p for p in (self.repo / 'local').glob('.usbboot-*') if p.is_dir()], [])
+        self.assertEqual([p for p in (self.repo / '.local').glob('.usbboot-*') if p.is_dir()], [])

@@ -27,7 +27,7 @@ class ToolsTest(unittest.TestCase):
         for name in ('polis-rpi4-base', 'polis-rpi4-speed'):
             (self.repo / 'profiles' / f'{name}.toml').write_text(
                 f'schema = 1\nname = "{name}"\nbase = "polis-rpi4-v1"\nrequires = []\ngroups = []\n')
-        self.ctx = Context(self.repo, self.br, self.br / 'dl', self.repo / 'snapshots')
+        self.ctx = Context(self.repo, self.br, self.br / 'dl', self.repo / '.snapshots')
         self.stdout = contextlib.redirect_stdout(StringIO())
         self.stdout.__enter__()
 
@@ -39,7 +39,7 @@ class ToolsTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def output(self, profile='polis-rpi4-speed'):
-        output = self.repo / 'output' / (profile + '-0123456789ab')
+        output = self.repo / '.output' / (profile + '-0123456789ab')
         (output / 'profile').mkdir(parents=True, exist_ok=True)
         (output / 'profile/defconfig').write_text('BR2_aarch64=y\n')
         (output / '.config').write_text(f'BR2_DEFCONFIG="{output}/profile/defconfig"\n')
@@ -125,8 +125,8 @@ class ToolsTest(unittest.TestCase):
 
     def test_image_discovery_requires_a_completed_matching_profile_audit(self):
         image = self.image(self.output())
-        self.image(self.repo / 'output/polis_rpi4')
-        self.image(self.repo / 'output/polis-rpi4-speed-no-audit')
+        self.image(self.repo / '.output/polis_rpi4')
+        self.image(self.repo / '.output/polis-rpi4-speed-no-audit')
         failed = self.output('polis-rpi4-base')
         self.image(failed)
         (failed / 'profile/audit.json').write_text(json.dumps(dict(profile='polis-rpi4-base', state='failed')))
@@ -285,9 +285,11 @@ class ToolsTest(unittest.TestCase):
             'package/control/firmware/src/main.rs',
             'package/probe/app/Cargo.toml', 'package/probe/app/src/main.rs',
             'package/control/src/target/mod.rs',
+            'package/control/src/.target/mod.rs',
         )
         generated = (
             'package/control/target/debug/daemon',
+            'package/control/.target/debug/daemon',
             'package/probe/app/target/release/probe',
             'src/__pycache__/cli.pyc',
         )
@@ -301,6 +303,7 @@ class ToolsTest(unittest.TestCase):
         self.assertTrue(set(sources) <= names)
         self.assertTrue(set(generated).isdisjoint(names))
         self.assertNotIn('package/control/target', names)
+        self.assertNotIn('package/control/.target', names)
         self.assertNotIn('package/probe/app/target', names)
         subprocess.run(['sha256sum', '-c', '--quiet', 'SHA256SUMS'], cwd=saved, check=True)
 

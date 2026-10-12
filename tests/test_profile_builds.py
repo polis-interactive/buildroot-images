@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from src.common import Context, UserError
-from src.profiles import resolver, workflow, provision
+from src.profiles import inputs, resolver, workflow, provision
 from src.profiles.image import recipe
 from src.profiles.options import BASE_GROUPS, Capability, Group
 
@@ -26,13 +26,16 @@ class ProfileBuildTests(unittest.TestCase):
         self.root = Path(temp.name)
         br = self.root / 'buildroot'
         (br / 'configs').mkdir(parents=True)
+        (br / 'Makefile').write_text('BR2_VERSION_EPOCH = 1788535000\n')
         shutil.copy2(REPO / 'profiles/base/upstream_defconfig', br / 'configs/raspberrypi4_64_defconfig')
-        self.ctx = Context(REPO, br, br / 'dl', self.root / 'snapshots')
-        self.output = self.root / 'output'
+        self.ctx = Context(REPO, br, br / 'dl', self.root / '.snapshots')
+        self.output = self.root / '.output'
         manifest = patch.object(resolver, 'input_manifest', return_value=[
             dict(root='repo', path='profiles/polis-rpi4-speed.toml', sha256='a' * 64)])
         manifest.start()
         self.addCleanup(manifest.stop)
+        self.enterContext(patch.object(inputs, 'verify_inputs', return_value=
+                                      json.loads((REPO / inputs.LOCK_PATH).read_text())))
 
     def plan(self, name='polis-rpi4-speed', groups=None, requires=None):
         if groups is None and requires is None:
@@ -166,6 +169,26 @@ class ProfileBuildTests(unittest.TestCase):
         self.assertIn('Differences from', staged)
         self.assertIn('gpu_mem', staged)
         workflow.assert_current(self.ctx, p, self.output)
+
+    def test_unchanged_configuration_reuses_files_and_completed_audit(self):
+        plan, _ = self.configure()
+        audit = json.loads((self.output / 'profile/audit.json').read_text())
+        audit['state'] = 'built'
+        workflow.save_audit(self.output, audit)
+        paths = [self.output / '.config', *(self.output / 'profile').iterdir()]
+        before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in paths}
+        with patch.object(workflow, 'run') as run, contextlib.redirect_stdout(io.StringIO()):
+            workflow.configure(self.ctx, plan, self.output, False)
+            run.assert_not_called()
+        self.assertEqual(before, {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in paths})
+
+    def test_every_profile_checks_the_shared_lock_before_configuration(self):
+        for name in self.ctx.profiles:
+            with self.subTest(profile=name), patch.object(inputs, 'verify_inputs',
+                    side_effect=UserError('Buildroot inputs differ')), patch.object(workflow, 'run') as run:
+                with self.assertRaisesRegex(UserError, 'Buildroot inputs differ'):
+                    workflow.configure(self.ctx, self.plan(name), self.output, False)
+                run.assert_not_called()
 
     def test_staged_build_rejects_changed_inputs_or_generated_files(self):
         p, _ = self.configure()

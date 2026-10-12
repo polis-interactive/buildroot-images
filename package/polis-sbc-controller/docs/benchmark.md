@@ -95,13 +95,13 @@ streams, missing trailers and disconnects. Only harmless startup pings and
 explicit capture-BUSY replies are retried within the deadline.
 
 Verified files are imported through `src/diagnostics/bootbench.py` into
-`local/polis-sbc-controller-state/captures/<boot UUID>/`. `capture.json` records hashes,
+`.local/polis-sbc-controller-state/captures/<boot UUID>/`. `capture.json` records hashes,
 import time and separate firmware/Linux metrics. Existing UUIDs cannot be
 overwritten with different content. Firmware `arm_s` is the firmware's ARM
 handoff timestamp; its clock is not added to Linux uptime or Pico timestamps.
 
 A benchmark run stores `benchmark.json` (min/median/max and samples) beneath
-`local/polis-sbc-controller-state/runs/<run ID>/`. Each `sample-NN/` retains:
+`.local/polis-sbc-controller-state/runs/<run ID>/`. Each `sample-NN/` retains:
 
 - `power-enable.json`: off checkpoint, actual enable record and Pico boot ID.
 - `uart.log`: raw bytes from that sample, including failed attempts.
@@ -153,8 +153,8 @@ successful automatic retrieval of firmware/kernel logs. All archived file
 hashes were independently rechecked. The enable-write brackets were 3–4 µs.
 These results retain the transport/rail timing limitations described above.
 
-Evidence: `local/polis-recovery/benchmark-acceptance.json`, the benchmark run
-folder, and `local/polis-sbc-controller-state/captures/`. First-boot capture negotiation
+Evidence: `.local/polis-recovery/benchmark-acceptance.json`, the benchmark run
+folder, and `.local/polis-sbc-controller-state/captures/`. First-boot capture negotiation
 exposed a USB startup race; the host handshake now tolerates the initial echoed
 ping/banner before the raw-mode service answers. All five unattended captures
 passed after that host fix. Native tests cover that startup sequence as well as

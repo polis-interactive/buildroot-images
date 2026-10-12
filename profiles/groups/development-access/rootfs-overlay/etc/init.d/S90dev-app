@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+pidfile=/run/polis-dev-app.pid
+case "${1:-}" in
+    start)
+        [ -x /data/bin/dev-app ] || exit 0
+        if start-stop-daemon -K -t -p "$pidfile" -x /data/bin/dev-app 2>/dev/null; then
+            exit 0
+        fi
+        [ ! -f /data/log/dev-app.log ] || mv -f /data/log/dev-app.log /data/log/dev-app.previous.log
+        start-stop-daemon -S -b -m -o -p "$pidfile" -x /data/bin/dev-app \
+            -d /data -O /data/log/dev-app.log
+        ;;
+    stop)
+        if [ -f "$pidfile" ]; then
+            start-stop-daemon -K -o -p "$pidfile" -x /data/bin/dev-app
+            # Do not race a still-running process when replacing its binary.
+            tries=0
+            while start-stop-daemon -K -t -p "$pidfile" -x /data/bin/dev-app 2>/dev/null; do
+                tries=$((tries + 1))
+                [ "$tries" -lt 100 ] || { echo "dev-app did not stop" >&2; exit 1; }
+                sleep 0.1
+            done
+            rm -f "$pidfile"
+        fi
+        ;;
+    restart) "$0" stop; "$0" start ;;
+    *) echo "Usage: $0 {start|stop|restart}" >&2; exit 1 ;;
+esac

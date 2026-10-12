@@ -102,7 +102,7 @@ def grow_data(device: Path, identity: tuple, image_size: int, source: dict,
 def discover_images(ctx: Context, output: Path | None = None) -> list[Path]:
     roots = []
     for profile in ctx.profiles:
-        for root in (ctx.repo / 'output').glob(f'{profile}-*'):
+        for root in (ctx.repo / '.output').glob(f'{profile}-*'):
             try:
                 audit = json.loads((root / 'profile/audit.json').read_text())
             except (OSError, ValueError):

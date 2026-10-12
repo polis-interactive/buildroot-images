@@ -6,7 +6,7 @@ import shutil
 from ..artifacts import snapshots
 from ..build import incremental
 from ..common import Context, UserError, run
-from . import provision
+from . import inputs, provision
 from .options import BASE_GROUPS, Group
 from .resolver import DOMAINS, digest, file_hash, read_kconfig, resolve, write_generated
 
@@ -14,18 +14,26 @@ from .resolver import DOMAINS, digest, file_hash, read_kconfig, resolve, write_g
 def output_for(ctx, plan, explicit=None):
     # Different input sets never inherit removed packages or old kernel objects.
     mode = '-development' if plan.development else ''
-    return (explicit or ctx.repo / 'output' / f'{plan.profile.name}{mode}-{plan.fingerprint[:12]}').resolve()
+    return (explicit or ctx.repo / '.output' / f'{plan.profile.name}{mode}-{plan.fingerprint[:12]}').resolve()
 
 
 def make_args(ctx, output):
-    return ['make', '-C', str(ctx.buildroot), f'O={output}', f'BR2_EXTERNAL={ctx.repo}',
+    args = ['make', '-C', str(ctx.buildroot), f'O={output}', f'BR2_EXTERNAL={ctx.repo}',
             f'BR2_DL_DIR={ctx.downloads}', f'BR2_DEFCONFIG={output / "profile/defconfig"}']
+    provenance = output / 'profile/build-inputs.json'
+    if provenance.is_file():
+        record = json.loads(provenance.read_text())
+        args.append(f'SOURCE_DATE_EPOCH={record["source_date_epoch"]}')
+    return args
 
 
 def generated_hashes(output):
     files = ['defconfig', 'kernel.fragment', 'busybox.fragment', 'config.txt',
              'cmdline.txt', 'image-plan.json']
     result = {f'profile/{name}': file_hash(output / 'profile' / name) for name in files}
+    for name in ('authorized_keys', 'build-inputs.json'):
+        if (output / 'profile' / name).is_file():
+            result[f'profile/{name}'] = file_hash(output / 'profile' / name)
     result['.config'] = file_hash(output / '.config')
     return result
 
@@ -125,12 +133,27 @@ def assert_current(ctx, plan, output, built=False):
 
 
 def configure(ctx, plan, output, display):
+    pins = inputs.verify_inputs(ctx, plan)
+    if plan.enabled(Group.DEVELOPMENT_ACCESS):
+        if not plan.ssh_public_key:
+            raise UserError('Development image requires an SSH public key; use the image/configure command')
     state = output / 'profile/state.json'
     owner = output / 'profile/owner.json'
     if (output / '.config').exists():
         if not owner.exists() or json.loads(owner.read_text())['fingerprint'] != plan.fingerprint:
             raise UserError('Output belongs to another input set; choose a fresh --output or use the default')
+    if state.is_file() and (output / 'profile/audit.json').is_file():
+        try:
+            assert_current(ctx, plan, output)
+        except (UserError, OSError):
+            pass  # Regenerate missing or changed config files below.
+        else:
+            if display:
+                print((output / 'profile/audit.txt').read_text())
+            print(f'Configuration audit: {output / "profile/audit.txt"} (unchanged; reused)')
+            return
     requested = write_generated(ctx, plan, output)
+    save_json(output / 'profile/build-inputs.json', inputs.provenance(ctx, plan, pins))
     save_json(owner, dict(fingerprint=plan.fingerprint))
     audit = new_audit(plan)
     save_audit(output, audit)
@@ -190,7 +213,9 @@ def build(ctx, plan, output):
         run([*args, 'all'])
         for check in audit['checks'][2:]:
             check.update(status='passed', detail='Buildroot post-build/image hook completed successfully.')
-        if resolve(ctx, plan.profile.name, development=plan.development).fingerprint != plan.fingerprint:
+        key_path = output / 'profile/authorized_keys' if plan.ssh_public_key else None
+        if resolve(ctx, plan.profile.name, development=plan.development,
+                   ssh_public_key=key_path).fingerprint != plan.fingerprint:
             raise UserError('Inputs changed during build; result is not certified')
         assert_current(ctx, plan, output)
         tracker.commit()
@@ -226,14 +251,21 @@ def prepare_eeprom(ctx, plan, output, capture):
     save_audit(output, audit)
 
 
-def execute(ctx, action, name, explicit=None, snapshot_name=None, *, capture=None, development=False):
+def execute(ctx, action, name, explicit=None, snapshot_name=None, *, capture=None, development=False,
+            ssh_public_key=None):
     if action == 'audit' and explicit:
         path = explicit.resolve() / 'profile/audit.txt'
         if not path.is_file():
             raise UserError(f'No saved audit at {path}; configure first')
         print(path.read_text())
         return explicit.resolve()
-    plan = resolve(ctx, name, development=development)
+    from .loader import load_profile
+    from .resolver import profile_path
+    if Group.DEVELOPMENT_ACCESS in load_profile(profile_path(ctx.repo, name)).groups:
+        if action in ('configure', 'image'):
+            from .development import ensure_key
+            ssh_public_key = ensure_key(ctx.repo, ssh_public_key)
+    plan = resolve(ctx, name, development=development, ssh_public_key=ssh_public_key)
     output = output_for(ctx, plan, explicit)
     if action == 'audit':
         path = output / 'profile/audit.txt'

@@ -8,7 +8,7 @@ import tempfile
 import threading
 import unittest
 
-BINARY = Path(__file__).resolve().parents[1] / 'package/polis-sbc-controller/target/debug/polis-sbc-controller'
+BINARY = Path(__file__).resolve().parents[1] / 'package/polis-sbc-controller/.target/debug/polis-sbc-controller'
 
 
 @unittest.skipUnless(BINARY.is_file(), 'build polis-sbc-controller native binaries first')

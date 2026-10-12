@@ -13,6 +13,8 @@ class Capability(StrEnum):
     UART_DIAGNOSTICS = "uart-diagnostics"
     USB_DIAGNOSTICS = "usb-diagnostics"
     WIFI = "wifi"
+    ETHERNET = "ethernet"
+    DEVELOPMENT_SSH = "development-ssh"
     DISPLAY = "display"
     CAMERA = "camera"
 
@@ -28,6 +30,7 @@ class Group(StrEnum):
     POLIS_RUNTIME = "polis-runtime"
     BOOT_DIAGNOSTICS = "boot-diagnostics"
     WIFI_IWD = "wifi-iwd"
+    DEVELOPMENT_ACCESS = "development-access"
     UART_DIAGNOSTICS = "uart-diagnostics"
     USB_DIAGNOSTICS = "usb-diagnostics"
     KERNEL_ENTRY_MARKER = "kernel-entry-marker"

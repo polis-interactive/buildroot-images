@@ -1,10 +1,11 @@
 # Polis Buildroot images
 
-Build Raspberry Pi 4 images from two declarative profiles:
+Build Raspberry Pi 4 images from declarative profiles:
 
 | Profile | Contents |
 | --- | --- |
 | [`polis-rpi4-base`](profiles/polis-rpi4-base.toml) | musl toolchain, read-only EROFS root, writable ext4 data, enforced static core linking |
+| [`polis-rpi4-dev`](profiles/polis-rpi4-dev.toml) | Development-only Ethernet DHCP, `polis-dev.local`, key-only SSH, iwd/iwctl, persistent state and application uploads |
 | [`polis-rpi4-speed`](profiles/polis-rpi4-speed.toml) | The base plus product services, diagnostics, capability restrictions, kernel/firmware optimizations, and EEPROM network-installer configuration |
 
 ```sh
@@ -20,6 +21,8 @@ Final images enable first-boot EEPROM configuration and `/data` expansion by
 default. `--development` skips both in an isolated build. The audit is always saved;
 the automatic workflow prints its location without displaying all differences.
 No profile is selected implicitly. Omit `--profile` to use the interactive picker.
+
+Build and use the development image with the [development image guide](docs/development-image.md).
 
 Planned work is tracked in [TODO.md](TODO.md).
 
@@ -53,10 +56,18 @@ restrictions and enable the drivers and userspace your product needs.
 The base does not select boot-log collection, Wi-Fi, or diagnostic services. Retaining
 a capability does not automatically install its drivers or applications.
 
-Generated files and audits live in `output/<profile>-<input-hash>/profile/`.
+Generated files and audits live in `.output/<profile>-<input-hash>/profile/`.
 Different inputs get separate build directories. Staged builds reject changed
 inputs or hand-edited generated configuration. Use the same `--output PATH`
 across configure/build/snapshot when overriding the default.
+
+Workspace artifacts use hidden directories: `.local/` for host tools, SSH keys,
+and controller state; `.output/` for builds; `.snapshots/` for saved images.
+When migrating an existing workspace, rename `local/`, `output/`, and `snapshots/`
+to these names while builds and the controller daemon are stopped. Preserve
+snapshot contents as captured. Existing Buildroot outputs embed absolute paths;
+start a fresh build directory after moving them. Restart the controller with
+`make sbc-controller-daemon` to rebuild it with the new paths.
 
 Requested changes carry ownership and input hashes. Buildroot, kernel and
 BusyBox selections are checked against their effective configurations, and ELF
@@ -124,7 +135,7 @@ make prepare-eeprom ARGS="--profile polis-rpi4-speed"
 ```
 
 The speed profile declares `NET_INSTALL_ENABLED=0`. Preparation uses its built
-normal image and the latest saved diagnostics in `local/polis-sbc-controller-state/captures`.
+normal image and the latest saved diagnostics in `.local/polis-sbc-controller-state/captures`.
 Use `--capture DIRECTORY` on `prepare-eeprom` to select a capture. To include
 EEPROM preparation in an image build and snapshot, explicitly pass
 `make image ARGS="--profile polis-rpi4-speed --capture DIRECTORY"`.
@@ -158,7 +169,7 @@ make setup
 
 Install uv separately if it is not already available. Setup downloads official
 `raspberrypi/usbboot` commit `861a703d8b51f42b76bcdff49da3e0f2766966bf`
-into ignored `local/usbboot/`, initializes its `rpi-eeprom` submodule at
+into ignored `.local/usbboot/`, initializes its `rpi-eeprom` submodule at
 `ded1e9332bd996f6adc46e10d22d9ef0298b1882`, and builds `rpiboot` locally.
 The implementation and pins live in [`src/setup/usbboot.py`](src/setup/usbboot.py).
 The first setup requires network access. Subsequent runs reuse the verified
@@ -167,15 +178,15 @@ revisions are rejected rather than overwritten. Failed downloads/builds leave
 no installed partial checkout.
 
 Setup also prepares the verified RAM recovery payload in
-`local/polis-sbc-controller-tools/gadget/`. Its config, checksum and recipe documentation
+`.local/polis-sbc-controller-tools/gadget/`. Its config, checksum and recipe documentation
 live in [`package/polis-sbc-controller/recovery/`](package/polis-sbc-controller/recovery/).
 Both tool directories are reproducible with `make setup`. Setup does not flash
 devices, provision EEPROM/OTP, or recreate device records or known-good snapshots.
-`local/polis-recovery/` is now historical evidence, with no current runtime dependency.
-UART logs and journals remain in `local/polis-sbc-controller-state/`.
+`.local/polis-recovery/` is now historical evidence, with no current runtime dependency.
+UART logs and journals remain in `.local/polis-sbc-controller-state/`.
 `make clean` continues to remove only `.cache/` and `dl/`.
-`make purge` removes all `output/` build directories, `local/usbboot/`, and
-`local/polis-sbc-controller-tools/`; run it only when recovery tools are idle, then
+`make purge` removes all `.output/` build directories, `.local/usbboot/`, and
+`.local/polis-sbc-controller-tools/`; run it only when recovery tools are idle, then
 run `make setup` afterward to restore the tools.
 
 For SBC controller hardware access, run `make setup-permissions` separately. It uses sudo
@@ -194,7 +205,7 @@ commands; `make image help` displays command options. CLI arguments also work as
 | `--buildroot PATH` | `/home/broosegoose/Software/buildroot-2026.08` |
 | `--downloads PATH` | the Buildroot tree's `dl/` directory |
 | `--output PATH` | profile-specific output derived from input hashes |
-| `--snapshots PATH` | this repository's `snapshots/` directory |
+| `--snapshots PATH` | this repository's `.snapshots/` directory |
 | `--name NAME` | for image/snapshot: profile plus date, with a unique suffix |
 
 Keep build directories at their original paths: generated host tools contain
@@ -298,7 +309,7 @@ are excluded from selection. Historical snapshots remain usable as evidence.
 ```sh
 make images
 make devices
-make flash ARGS="--image snapshots/my-speed-image/images/sdcard.img --device /dev/sdX"
+make flash ARGS="--image .snapshots/my-speed-image/images/sdcard.img --device /dev/sdX"
 make image ARGS="--profile polis-rpi4-speed --development --name my-speed-dev"
 make smoke ARGS="--snapshot my-speed-dev --target init --runs 3"
 ```

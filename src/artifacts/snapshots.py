@@ -112,7 +112,7 @@ def snapshot(ctx: Context, source: Path, name: str) -> Path:
             return None
         # Prune Cargo output before tarfile recurses into gigabytes of binaries.
         # Preserve unrelated source directories that happen to be named target.
-        if path.name == "target" and (ctx.repo / path.parent / "Cargo.toml").is_file():
+        if path.name in ("target", ".target") and (ctx.repo / path.parent / "Cargo.toml").is_file():
             return None
         return info
     print("Snapshot 3/5: archiving workspace sources (excluding Cargo target directories)...",

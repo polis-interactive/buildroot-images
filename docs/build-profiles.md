@@ -5,7 +5,8 @@ The base is **musl, EROFS, and enforced static linking of core executables**.
 An audit is always saved. A complete automatic build prints its location, not
 the differences; staged configuration displays the differences before building.
 
-The CLI consumes [`polis-rpi4-base`](../profiles/polis-rpi4-base.toml) and
+The CLI consumes [`polis-rpi4-base`](../profiles/polis-rpi4-base.toml),
+[`polis-rpi4-dev`](../profiles/polis-rpi4-dev.toml), and
 [`polis-rpi4-speed`](../profiles/polis-rpi4-speed.toml). The speed profile selects the optimized kernel, firmware, image layout and
 EEPROM settings. Commands and EEPROM preparation are documented in the
 [README](../README.md#declarative-build-profiles).
@@ -18,6 +19,47 @@ comparison and attribution are not implemented yet**: coverage stays pending,
 and `configured` currently certifies the requested plan and Buildroot selections.
 The complete-effective-coverage requirements below remain the target contract;
 the current audit does not claim to satisfy them.
+
+## Shared input lock and rebuilds
+
+Every profile uses [`profiles/buildroot.lock.json`](../profiles/buildroot.lock.json).
+It contains the Buildroot source URL, archive SHA-256, and a digest of the
+Buildroot files used by this repository. Configuration checks the supplied tree
+against that digest, including when reusing an existing configuration. A changed
+Buildroot tree requires an explicitly reviewed lock update; it is not silently
+accepted based on a matching release name or defconfig.
+
+The lock does not repeat Buildroot's package, firmware, kernel or toolchain pins.
+Those remain in Buildroot's recipes and hashes, together with the selected profile
+configuration. The build timestamp is derived from `BR2_VERSION_EPOCH` in the
+locked Buildroot Makefile. `BR2_REPRODUCIBLE` is inherited by all profiles; FAT,
+ext4 and the speed profile's nested boot image use stable filesystem metadata.
+The timestamp controls output bytes, not source change detection.
+
+Input fingerprints use file contents, permissions and symlink destinations.
+Touching a file does not select a new output directory or invalidate cached
+component rules. Only the selected profile and selected groups' definitions and
+payloads enter the profile-input portion of the fingerprint; editing an unselected
+profile or its overlay does not invalidate another profile. Shared build code,
+packages, board support and patches remain conservatively tracked across profiles.
+Relevant source changes still select an isolated output directory, preserving the
+existing protection against removed packages and stale kernel objects.
+
+Repeated configuration reuses a verified unchanged `.config` and audit instead of
+rerunning defconfig. Generated fragments are written only when their contents
+change. Component rules use their selected configuration and declared inputs;
+they no longer include every profile's overlays as global compilation inputs.
+Final validation/image assembly still runs when invoking `build` or `image`.
+
+Each configuration saves `profile/build-inputs.json` with the shared lock, derived
+epoch, source revision/dirty status and plan digest. The existing audit, effective
+component configs and snapshot source archive retain the build evidence. The
+public-key digest is included only for profiles with development SSH access.
+Changing Git revision or file mtimes alone is not a compilation input.
+
+This migration changes fingerprint calculation, so the first build after updating
+uses a new output directory. Subsequent unchanged builds reuse that directory.
+Build commands stay the same; no full builds are run during agent validation.
 
 ## The comparison base
 

@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "buildroot_url": "https://buildroot.org/downloads/buildroot-2026.08.tar.xz",
+  "buildroot_archive_sha256": "87aaca4164ea9d5c8085854953018263f7963f07c22e73a2a2185cc98c581c34",
+  "buildroot_inputs_sha256": "6d65a17ef435d7a0f399b577620d745960e42eb49d79058ae129b5b0ff7b9f54"
+}

@@ -127,7 +127,7 @@ class EepromTests(unittest.TestCase):
 
     def test_latest_capture_is_selected_and_base_needs_none(self):
         repo = self.root / 'repo'
-        captures = repo / 'local/polis-sbc-controller-state/captures'
+        captures = repo / '.local/polis-sbc-controller-state/captures'
         captures.mkdir(parents=True)
         for name, timestamp in (('z-old', '2026-10-09T00:00:00Z'), ('a-new', '2026-10-10T00:00:00Z')):
             shutil.copytree(self.capture(), captures / name)
@@ -141,7 +141,7 @@ class EepromTests(unittest.TestCase):
     def test_snapshot_saves_selected_bundle_and_rejects_tampering(self):
         plan = self.built()
         workflow.prepare_eeprom(self.ctx, plan, self.output, self.capture(True))
-        (self.ctx.buildroot / 'Makefile').write_text('# fixture')
+        (self.ctx.buildroot / 'Makefile').write_text('# fixture\nBR2_VERSION_EPOCH = 1788535000\n')
         repo = self.root / 'small-repo'; repo.mkdir()
         ctx = replace(self.ctx, repo=repo)
         with contextlib.redirect_stdout(io.StringIO()):

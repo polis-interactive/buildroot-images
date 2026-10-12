@@ -36,7 +36,7 @@ def main():
     env = dict(os.environ, PATH=f"{host / 'bin'}:{host / 'sbin'}:{os.environ['PATH']}")
     with tempfile.TemporaryDirectory(prefix='polis-profiles-') as directory:
         tmp = Path(directory)
-        ctx = Context(REPO, buildroot, buildroot / 'dl', tmp / 'snapshots')
+        ctx = Context(REPO, buildroot, buildroot / 'dl', tmp / '.snapshots')
         for name in ctx.profiles:
             output = tmp / name
             plan = resolver.resolve(ctx, name)

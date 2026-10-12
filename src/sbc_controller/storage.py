@@ -258,7 +258,7 @@ def dispatch(request):
         return flash(config, request['image'], request.get('confirm_fixture'))
     if action == 'images':
         root = Path(config['repo_root'])
-        context = Context(root, root / 'buildroot', root / 'dl', root / 'snapshots')
+        context = Context(root, root / 'buildroot', root / 'dl', root / '.snapshots')
         return [str(p) for p in discover_images(context)]
     raise UserError('Unknown storage adapter action')
 

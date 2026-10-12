@@ -53,7 +53,7 @@ host USB permissions, but permits reflashing to remain disabled until the actual
 SD LUN identities are recorded. Poll `status` using the returned run ID. A lost
 reply or failed run must be inspected before another explicit invocation.
 
-`local/polis-sbc-controller-state/` stores logs and run journals only. Its private socket
+`.local/polis-sbc-controller-state/` stores logs and run journals only. Its private socket
 is `daemon.sock`; it is not a configuration directory. The repository's absolute
 path is embedded at build time. Rebuild after moving the checkout.
 
@@ -85,14 +85,14 @@ afterward. Pin an official RAM gadget payload containing `config.txt`, `boot.img
 and either `bootfiles.bin` with `2711/bootcode4.bin` or a loose `bootcode4.bin`;
 EEPROM/OTP recovery payloads are rejected. The prepared payload and commissioning
 status are recorded in [recovery.md](recovery.md#commissioning-progress--2026-10-09).
-`make setup` recreates the commissioned payload at `local/polis-sbc-controller-tools/gadget/`
+`make setup` recreates the commissioned payload at `.local/polis-sbc-controller-tools/gadget/`
 using the tracked [recovery recipe and checksum](../recovery/README.md).
 Hashes can be computed without device access:
 
 ```sh
 sha256sum /absolute/path/to/known-good/sdcard.img
 # From the BuildrootImages repository root:
-python3 -m src.sbc_controller.storage payload-hash local/polis-sbc-controller-tools/gadget
+python3 -m src.sbc_controller.storage payload-hash .local/polis-sbc-controller-tools/gadget
 ```
 
 The directory hash includes each relative filename and the SHA-256 of its bytes,
@@ -140,10 +140,10 @@ or disconnection triggers this shutdown on the next controller pass. Reconnectio
 leaves power off until explicitly commanded on; commands must not be replayed. Equivalent direct invocation and client examples:
 
 ```sh
-target/debug/polis-sbc-controller-daemon
+.target/debug/polis-sbc-controller-daemon
 
-target/debug/polis-sbc-controller --socket /private/state/daemon.sock --fixture bench-rpi4b status
-target/debug/polis-sbc-controller --socket /private/state/daemon.sock --fixture bench-rpi4b images
+.target/debug/polis-sbc-controller --socket /private/state/daemon.sock --fixture bench-rpi4b status
+.target/debug/polis-sbc-controller --socket /private/state/daemon.sock --fixture bench-rpi4b images
 ```
 
 A run without `--image` performs a normal power cycle and readiness observation.
@@ -151,7 +151,7 @@ An explicit image first enters recovery, loads the RAM gadget, writes and
 verifies that image, and returns to normal boot:
 
 ```sh
-target/debug/polis-sbc-controller --socket /private/state/daemon.sock --fixture bench-rpi4b \
+.target/debug/polis-sbc-controller --socket /private/state/daemon.sock --fixture bench-rpi4b \
   run --image /absolute/path/candidate.img --sha256 IMAGE_SHA256 \
   --confirm-fixture bench-rpi4b
 ```
@@ -207,7 +207,7 @@ The daemon terminal now prints readable Pi UART lines as well as connection
 messages. `POLIS_*` lines are tagged `MARKER`; lines mentioning errors, failures,
 panics, or undervoltage are tagged `WARN`. This is a display classification, not
 proof that the configured readiness condition passed. To watch the original bytes
-from a second terminal, use `tail -f local/polis-sbc-controller-state/uart.bin`. An empty file and
+from a second terminal, use `tail -f .local/polis-sbc-controller-state/uart.bin`. An empty file and
 `uart_rx_offset: 0` mean no bytes were captured; a successful Pico Hello proves
 only the host-to-Pico USB connection. Use the exact spelling `POLIS_SMOKE_READY`.
 

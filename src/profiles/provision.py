@@ -18,7 +18,7 @@ def capture_for(ctx, plan, explicit=None):
     capture = explicit
     if capture is None:
         candidates = []
-        for metadata in (ctx.repo / 'local/polis-sbc-controller-state/captures').glob('*/capture.json'):
+        for metadata in (ctx.repo / '.local/polis-sbc-controller-state/captures').glob('*/capture.json'):
             data = json.loads(metadata.read_text())
             candidates.append((data.get('imported_utc', ''), metadata.parent))
         if candidates:

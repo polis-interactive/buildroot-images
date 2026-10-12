@@ -63,17 +63,31 @@ def list_profiles(repo):
 def input_manifest(ctx, path):
     """Hash source content/modes, not timestamps or generated build directories."""
     result = []
-    roots = [ctx.repo / name for name in
-             ('src', 'profiles', 'board', 'build-support', 'package', 'patches', 'Config.in',
+    repo_paths = [ctx.repo / name for name in
+             ('src', 'board', 'build-support', 'package', 'patches', 'Config.in',
               'external.mk', 'external.desc', 'build.toml')]
-    roots += [ctx.buildroot / name for name in
+    repo_paths += [path, ctx.repo / 'profiles/base', ctx.repo / 'profiles/post-image.py',
+                   ctx.repo / 'profiles/buildroot.lock.json']
+    selected = {*BASE_GROUPS, *load_profile(path).groups}
+    for group in Group:
+        if group not in selected:
+            continue
+        repo_paths.append(ctx.repo / 'profiles/groups' / f'{group.value}.toml')
+        payload = ctx.repo / 'profiles/groups' / group.value
+        if payload.exists():
+            repo_paths.append(payload)
+        data = load_group(ctx.repo, group)
+        for field in ('inputs', 'overlays', 'post_build'):
+            repo_paths.extend(ctx.repo / name for name in data.get(field, []))
+    roots = [(item, ctx.repo, 'repo') for item in repo_paths]
+    roots += [(ctx.buildroot / name, ctx.buildroot, 'buildroot') for name in
               ('Makefile', 'Config.in', 'Config.in.legacy', 'arch', 'toolchain',
                'linux', 'package', 'system', 'fs', 'support/scripts', 'support/kconfig',
                'configs/raspberrypi4_64_defconfig', 'board/raspberrypi', 'board/raspberrypi4-64')]
     seen = set()
 
     def visit(item, root, label):
-        if item.name in ('target', '__pycache__', '.git') or item.suffix in ('.pyc', '.md'):
+        if item.name in ('target', '.target', '__pycache__', '.git') or item.suffix in ('.pyc', '.md'):
             return
         if item in seen:
             return
@@ -90,8 +104,7 @@ def input_manifest(ctx, path):
         else:
             raise UserError(f'Missing profile input: {item}')
 
-    for item in roots:
-        root, label = (ctx.repo, 'repo') if item.is_relative_to(ctx.repo) else (ctx.buildroot, 'buildroot')
+    for item, root, label in roots:
         visit(item, root, label)
     return result
 
@@ -131,16 +144,28 @@ class Plan:
     overlays: list
     post_build: list
     development: bool = False
+    ssh_public_key: str = ''
+    source_date_epoch: int = 0
 
     def enabled(self, group):
         return group.value in self.groups
 
 
-def resolve(ctx: Context, name: str, *, development=False) -> Plan:
-    path = profile_path(ctx.repo, name)
-    profile = load_profile(path)
+def resolve(ctx: Context, name: str, *, development=False, ssh_public_key=None) -> Plan:
+    selected_profile_path = profile_path(ctx.repo, name)
+    profile = load_profile(selected_profile_path)
+    ssh_key_text = ''
+    if Group.DEVELOPMENT_ACCESS in profile.groups:
+        from .development import public_key
+        key_path = ssh_public_key or ctx.repo / '.local/development-ssh/id_ed25519.pub'
+        if Path(key_path).is_file():
+            ssh_key_text = public_key(key_path)
+        elif ssh_public_key:
+            raise UserError(f'Missing SSH public key: {key_path}')
+    elif ssh_public_key:
+        raise UserError('--ssh-public-key requires the development-access group')
     if profile.name != name:
-        raise UserError(f'{path}: profile name must match its filename')
+        raise UserError(f'{selected_profile_path}: profile name must match its filename')
     upstream = ctx.repo / 'profiles/base/upstream_defconfig'
     actual = ctx.buildroot / 'configs/raspberrypi4_64_defconfig'
     if upstream.read_bytes() != actual.read_bytes():
@@ -217,7 +242,7 @@ def resolve(ctx: Context, name: str, *, development=False) -> Plan:
                              sha256=digest(os.readlink(p)) if p.is_symlink() else file_hash(p))
                         for p in files if (p.is_file() or p.is_symlink())
                         and p.suffix not in ('.md', '.pyc')
-                        and not any(part in ('target', '__pycache__', '.git') for part in p.parts)]
+                        and not any(part in ('target', '.target', '__pycache__', '.git') for part in p.parts)]
             if not path.exists():
                 raise UserError(f'{group}: missing input {source}')
             changes.append(dict(comparison='upstream-to-base' if Group(group) in BASE_GROUPS else 'base-to-profile',
@@ -263,11 +288,14 @@ def resolve(ctx: Context, name: str, *, development=False) -> Plan:
             assign('image', key, value, group)
     if development:
         assign('firmware', 'bootloader_update', '0', 'erofs-root')
-    inputs = input_manifest(ctx, path)
+    inputs = input_manifest(ctx, selected_profile_path)
+    from .inputs import source_date_epoch
     fingerprint = digest(dict(inputs=inputs, profile=profile.name, groups=ordered,
-                              buildroot=str(ctx.buildroot), repo=str(ctx.repo), development=development))
+                              buildroot=str(ctx.buildroot), repo=str(ctx.repo), development=development,
+                              ssh_public_key=ssh_key_text))
     plan = Plan(profile, {g: groups[g] for g in ordered}, values, changes, inputs,
-                fingerprint, overlays, post_build, development)
+                fingerprint, overlays, post_build, development, ssh_key_text,
+                source_date_epoch(ctx.buildroot))
     compose_buildroot(plan)
     return plan
 
@@ -317,6 +345,10 @@ def compose_buildroot(plan):
 def write_generated(ctx, plan, output):
     directory = output / 'profile'
     directory.mkdir(parents=True, exist_ok=True)
+    def write(name, text):
+        path = directory / name
+        if not path.is_file() or path.read_text() != text:
+            path.write_text(text)
     selected = plan.values
     firmware = dict(selected['firmware'])
     premerge = plan.enabled(Group.PREMERGE_OVERLAYS)
@@ -324,19 +356,23 @@ def write_generated(ctx, plan, output):
     for key in firmware:
         if key.startswith('overlay:') and not (premerge and key[8:] in ('disable-bt', 'dwc2,dr_mode=peripheral')):
             lines.append('dtoverlay=' + key[8:])
-    (directory / 'config.txt').write_text('\n'.join(lines) + '\n')
+    write('config.txt', '\n'.join(lines) + '\n')
     tokens = []
     for key, value in selected['cmdline'].items():
         tokens += [key + ('=' + v if v else '') for v in (value.split() if key == 'console' else [value])]
-    (directory / 'cmdline.txt').write_text(' '.join(tokens) + '\n')
+    write('cmdline.txt', ' '.join(tokens) + '\n')
     for domain in ('kernel', 'busybox'):
-        (directory / f'{domain}.fragment').write_text(kconfig_text(selected[domain]))
+        write(f'{domain}.fragment', kconfig_text(selected[domain]))
     buildroot = dict(selected['buildroot'])
-    (directory / 'defconfig').write_text(kconfig_text(buildroot))
-    (directory / 'image-plan.json').write_text(json.dumps(dict(
+    write('defconfig', kconfig_text(buildroot))
+    if plan.ssh_public_key:
+        write('authorized_keys', plan.ssh_public_key)
+    write('image-plan.json', json.dumps(dict(
         lz4=plan.enabled(Group.LZ4_KERNEL), premerge=premerge,
         cutdown=plan.enabled(Group.CUTDOWN_FIRMWARE),
         ramdisk=plan.enabled(Group.BOOT_RAMDISK), eeprom=selected['eeprom'],
         development=plan.development,
+        reproducible=selected['buildroot'].get('BR2_REPRODUCIBLE') == 'y',
+        source_date_epoch=plan.source_date_epoch,
         profile=plan.profile.name, fingerprint=plan.fingerprint), indent=2) + '\n')
     return buildroot

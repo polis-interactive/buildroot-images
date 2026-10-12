@@ -37,6 +37,8 @@
           "uart-diagnostics",
           "usb-diagnostics",
           "wifi",
+          "ethernet",
+          "development-ssh",
           "display",
           "camera"
         ]
@@ -51,6 +53,7 @@
           "polis-runtime",
           "boot-diagnostics",
           "wifi-iwd",
+          "development-access",
           "uart-diagnostics",
           "usb-diagnostics",
           "kernel-entry-marker",

@@ -1,0 +1,29 @@
+#!/bin/sh
+# Target-side checks; record these before and after reboot.
+set -eu
+[ "$(uname -m)" = aarch64 ]
+[ "$(hostname)" = polis-dev ]
+printf 'model='; tr -d '\000' </proc/device-tree/model; echo
+printf 'serial='; tr -d '\000' </proc/device-tree/serial-number; echo
+uname -a
+awk '$2 == "/" && $4 ~ /(^|,)ro(,|$)/ { ok=1 } END { exit !ok }' /proc/mounts
+awk '$2 == "/data" && $3 == "ext4" && $4 ~ /(^|,)rw(,|$)/ { ok=1 } END { exit !ok }' /proc/mounts
+awk '$2 == "/var/lib" && $3 == "ext4" { ok=1 } END { exit !ok }' /proc/mounts
+[ "$(cat /sys/class/net/eth0/carrier)" = 1 ]
+ip -4 addr show dev eth0
+[ -d /var/lib/iwd ]
+[ -S /run/dbus/system_bus_socket ]
+dbus-send --system --print-reply --dest=org.freedesktop.DBus / org.freedesktop.DBus.ListNames
+# This must succeed against the running iwd, not just find its executable.
+dbus-send --system --print-reply --dest=net.connman.iwd / org.freedesktop.DBus.ObjectManager.GetManagedObjects
+iwctl device list
+found=0
+for interface in /sys/class/net/*; do
+    if [ -d "$interface/wireless" ] || [ -e "$interface/phy80211" ]; then
+        echo "wifi-device=${interface##*/}"
+        found=1
+    fi
+done
+[ "$found" = 1 ]
+cat /etc/polis-development-image.json
+echo POLIS_DEV_CHECK_PASSED

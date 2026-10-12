@@ -40,8 +40,11 @@ optimized profile explicitly. There is one workspace lockfile and no global
 embedded target, allocator, or BSP crate. CYW43 is initialized only to drive the
 onboard LED; no network stack, Wi-Fi association, or Bluetooth is started.
 
+Cargo stores native and firmware build artifacts in `.target/`, as configured in
+`.cargo/config.toml`. The repository Make targets use the same directory.
+
 The linked ELF is
-`target/thumbv8m.main-none-eabihf/firmware/polis-sbc-controller-firmware`.
+`.target/thumbv8m.main-none-eabihf/firmware/polis-sbc-controller-firmware`.
 To build and flash, hold BOOTSEL while connecting the Pico's USB cable, release
 it, and run from the repository root:
 
@@ -57,7 +60,7 @@ Pi's serial. `CARGO` and `PICOTOOL` can override executable paths. For an alread
 built ELF, the equivalent command from this workspace is:
 
 ```sh
-picotool load -v -x -t elf target/thumbv8m.main-none-eabihf/firmware/polis-sbc-controller-firmware
+picotool load -v -x -t elf .target/thumbv8m.main-none-eabihf/firmware/polis-sbc-controller-firmware
 ```
 
 Flashing/resetting the Pico switches the Pi off. Flashing is never part of a
@@ -73,7 +76,7 @@ See the [host guide](docs/host.md).
 
 The daemon terminal logs CLI/MCP requests and outcomes, workflow stages, and
 received Pi UART lines. Readiness markers and UART errors are highlighted;
-`local/polis-sbc-controller-state/uart.bin` retains the original bytes. Rebuild/restart the
+`.local/polis-sbc-controller-state/uart.bin` retains the original bytes. Rebuild/restart the
 daemon to pick up logging changes; no Pico reflash is needed for host logging.
 
 ## Fixture wiring

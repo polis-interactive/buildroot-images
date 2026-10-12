@@ -8,6 +8,7 @@ import tempfile
 
 
 def recipe(images, plan):
+    reproducible = plan.get('reproducible', False)
     kernel = 'Image.lz4boot' if plan['lz4'] else 'Image'
     dtb = 'bcm2711-rpi-4-b.premerged.dtb' if plan['premerge'] else 'bcm2711-rpi-4-b.dtb'
     start, fixup = ('start4cd.elf', 'fixup4cd.dat') if plan['cutdown'] else ('start4.elf', 'fixup4.dat')
@@ -19,11 +20,18 @@ def recipe(images, plan):
 
     def fat(name, files, size, compact=False):
         lines = [f'image {name} {{', '\tvfat {']
+        args = ['--invariant'] if reproducible else []
         if compact:
-            lines.append('\t\textraargs = "-F 16 -s 1"')
+            args += ['-F 16 -s 1']
+        if args:
+            lines.append('\t\textraargs = "' + ' '.join(args) + '"')
         for destination, source in files.items():
             lines.append(f'\t\tfile {destination} {{ image = "{source}" }}')
-        return '\n'.join([*lines, '\t}', f'\tsize = {size}M', '}'])
+        lines += ['\t}', f'\tsize = {size}M']
+        if reproducible:
+            # In a boot ramdisk layout, boot.img becomes an input to boot.vfat.
+            lines.append('\texec-post = "touch -d @$SOURCE_DATE_EPOCH \\"$IMAGEOUTFILE\\""')
+        return '\n'.join([*lines, '}'])
 
     inner_size = None
     if plan['ramdisk']:
@@ -67,6 +75,11 @@ image sdcard.img {
     }
 }
 '''
+    if reproducible:
+        text = text.replace('label = "polis-data"',
+                            'label = "polis-data"\n'
+                            '           extraargs = "-U 706f6c69-732d-4465-9665-6c6f706d656e '
+                            '-E hash_seed=706f6c69-732d-4465-9665-6c6f706d656e,lazy_itable_init=0,lazy_journal_init=0"')
     return text, inner_size
 
 
@@ -76,6 +89,10 @@ def assemble(env=None):
     repo = Path(env['BR2_EXTERNAL_POLIS_PATH'])
     images, host, build = [Path(env[k]) for k in ('BINARIES_DIR', 'HOST_DIR', 'BUILD_DIR')]
     plan = json.loads((output / 'profile/image-plan.json').read_text())
+    if plan.get('reproducible'):
+        epoch = int(plan['source_date_epoch'])
+        env.update(SOURCE_DATE_EPOCH=str(epoch), E2FSPROGS_FAKE_TIME=str(epoch),
+                   E2FSCK_TIME=str(epoch), TZ='UTC')
     if plan['lz4']:
         subprocess.run(['python3', str(repo / 'board/rpi4/lz4-loader/build.py'),
                         str(images / 'Image'), str(images / 'Image.lz4boot'), str(host),
@@ -86,6 +103,12 @@ def assemble(env=None):
     if plan['ramdisk']:
         config = (images / 'rpi-firmware/config.txt').read_text()
         (images / 'boot-ramdisk-config.txt').write_text(config.rstrip() + '\nboot_ramdisk=1\n')
+    if plan.get('reproducible'):
+        # Include generated LZ4, premerged DTB and ramdisk config payloads.
+        # Avoid touching equal mtimes, which can otherwise disturb Make rules.
+        for path in sorted(images.rglob('*'), reverse=True):
+            if not path.is_symlink() and path.stat().st_mtime != epoch:
+                os.utime(path, (epoch, epoch))
     text, size = recipe(images, plan)
     config = output / 'profile/genimage.cfg'
     config.write_text(text)

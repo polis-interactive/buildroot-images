@@ -7,6 +7,7 @@ overlays = ["profiles/base/rootfs-overlay"]
 inputs = ["src/profiles/image.py", "profiles/post-image.py"]
 
 [buildroot]
+"BR2_REPRODUCIBLE" = "y"
 "BR2_TARGET_ROOTFS_EXT2" = "n"
 "BR2_TARGET_ROOTFS_EROFS" = "y"
 "BR2_TARGET_ROOTFS_EROFS_LZ4HC" = "y"

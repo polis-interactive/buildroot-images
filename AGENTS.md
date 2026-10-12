@@ -1,5 +1,18 @@
 # Repository instructions
 
+## Validate changes; leave builds to the user
+
+- Do not run image, kernel, or toolchain builds unless the user explicitly asks
+  you to run them. Requests to implement or fix image support do not authorize
+  `make image`, `make build`, or equivalent Buildroot compilation commands.
+- Validate changes with focused host tests, profile/schema checks, configuration
+  checks, and command-help checks as appropriate. Keep validation separate from
+  a full build; the user runs the build after the changes are ready.
+- Hand off the exact build command and relevant output paths. State what was
+  verified and what remains unverified; passing host tests does not establish
+  that an image compiles or boots. Do not claim an image checksum or hardware
+  acceptance without a completed build or actual hardware evidence.
+
 ## Makefile and command help
 
 - Keep `make help` synchronized with Makefile changes. When adding, removing,

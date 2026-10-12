@@ -1,0 +1,6 @@
+#:schema ../docs/build-profiles/profile-v1.schema.json
+schema = 1
+name = "polis-rpi4-dev"
+base = "polis-rpi4-v1"
+requires = ["wifi", "ethernet", "development-ssh"]
+groups = ["wifi-iwd", "development-access", "headless"]

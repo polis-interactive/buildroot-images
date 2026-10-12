@@ -1,0 +1,2 @@
+# Bound persistent system logs to approximately 1 MiB.
+SYSLOGD_ARGS="-O /data/log/messages -s 256 -b 3"

@@ -11,9 +11,9 @@ Permission rules now match supported device types; the daemon still pins and
 validates the commissioned fixture's USB topology, serial and SD LUN identity.
 
 Current RAM payload setup is also reproducible: `make setup` prepares
-`local/polis-sbc-controller-tools/gadget/` from the pinned download and the package's
+`.local/polis-sbc-controller-tools/gadget/` from the pinned download and the package's
 [recovery sources](../recovery/README.md). The daemon uses that path. References
-to `local/polis-recovery/` below describe historical commissioning artifacts;
+to `.local/polis-recovery/` below describe historical commissioning artifacts;
 that directory is no longer required by the tools.
 
 ## Current bench wiring and evidence — 2026-10-09
@@ -73,7 +73,7 @@ USB recovery, SD reflashing, or power stability under load.
 
 The user confirmed GP14 connects through an N-channel/open-drain transistor to
 Pi GPIO8. The direct diagnostic USB device is on host topology `3-4`.
-`snapshots/polis_rpi4_musl_erofs-well-known/images/sdcard.img` is the previously
+`.snapshots/polis_rpi4_musl_erofs-well-known/images/sdcard.img` is the previously
 USB-tested snapshot 2, SHA-256
 `847af678eb5e732c61322d64d2c7362489f7f4b58b1a4b886211b14dd5acece3`.
 Inspection of its actual FAT boot partition confirms **no OTP provisioning
@@ -84,22 +84,22 @@ not been read from this Pi.
 Host preparation is complete, without changing physical-device state:
 
 `make setup` now downloads the pinned `usbboot` checkout and its EEPROM submodule
-and builds `rpiboot` under `local/usbboot/`. That directory can be recreated after
+and builds `rpiboot` under `.local/usbboot/`. That directory can be recreated after
 deletion. See the repository [setup instructions](../../../README.md#build-tools-and-incremental-work)
 for host prerequisites. Setup now recreates the same commissioned gadget bytes
-under `local/polis-sbc-controller-tools/gadget/`; provisioning records remain separate.
+under `.local/polis-sbc-controller-tools/gadget/`; provisioning records remain separate.
 
 - Official `usbboot` commit `861a703d8b51f42b76bcdff49da3e0f2766966bf`
-  is checked out under `local/usbboot`; `make -C local/usbboot` built `rpiboot`.
+  is checked out under `.local/usbboot`; `make -C .local/usbboot` built `rpiboot`.
   Its `rpi-eeprom` submodule is pinned at
   `ded1e9332bd996f6adc46e10d22d9ef0298b1882`.
 - The official `boot.img`, `config.txt`, and dereferenced `bootfiles.bin` are
-  copied to `local/polis-recovery/gadget`. Directory SHA-256 is
+  copied to `.local/polis-recovery/gadget`. Directory SHA-256 is
   `a41a8f03f22d78dd873903ea92056b302e6e879cf003f1f2ec8d4f6dd354dd2d`.
   The adapter validates the Pi 4 loader inside the official archive without
   extracting it; this payload passes software validation, not hardware acceptance.
 - A **separate, unflashed** provisioning image is prepared at
-  `local/polis-recovery/provisioning/images-2711/pi4-program-rpiboot-gpio8.zip`
+  `.local/polis-recovery/provisioning/images-2711/pi4-program-rpiboot-gpio8.zip`
   using the pinned official `rpi-eeprom/imager/make-pi4-rpiboot-gpio-sd 8`.
   Booting it permanently selects GPIO8; do not include it in normal builds or
   use it as the daemon's RAM gadget or known-good image.
@@ -130,8 +130,8 @@ mode. UART reported `Updating OTP to use GPIO8 to enable USB-device boot
 **GPIO-forced ROM recovery is hardware verified.** A subsequent daemon-controlled
 cold boot with recovery selected enumerated `0a5c:2711 BCM2711 Boot` on `3-4`.
 `OTP_GPIO8_PROVISIONED` is now true. Evidence is in
-`local/polis-recovery/provisioning/otp-boot-uart.log`, `otp-result.json`, and
-`local/polis-sbc-controller-state/runs/1791588059369-14178703325a0fc9/`.
+`.local/polis-recovery/provisioning/otp-boot-uart.log`, `otp-result.json`, and
+`.local/polis-sbc-controller-state/runs/1791588059369-14178703325a0fc9/`.
 That run reached `rom_verified`, then stopped because libusb access was denied.
 The user subsequently installed the ROM USB rule, resolving that permission failure.
 
@@ -146,8 +146,8 @@ storage LUN has been qualified. Status/log reads remain available throughout.
 
 The user-started foreground daemon was replaced with the updated daemon under
 the Codex session for commissioning. Its console log is
-`local/polis-sbc-controller-state/commissioning-daemon.log`. The prepared command
-`sudo sh local/polis-recovery/install-usb-rule.sh` installs a USB permission rule
+`.local/polis-sbc-controller-state/commissioning-daemon.log`. The prepared command
+`sudo sh .local/polis-recovery/install-usb-rule.sh` installs a USB permission rule
 limited to VID/PID `0a5c:2711` at port `3-4`, owned by the daemon user
 `broosegoose`. This rule is installed and grants ROM USB access only.
 
@@ -158,7 +158,7 @@ serial `1000000000e4bb49`, with udev
 `ID_PATH=pci-0000:00:14.0-usb-0:4:1.0-scsi-0:0:0:0` on USB port `3-4`.
 These exact identities are now source constants. The desktop initially
 automounted the provisioning partition; commissioning explicitly unmounted it.
-The user installed `local/polis-recovery/install-storage-rule.sh`, which grants
+The user installed `.local/polis-recovery/install-storage-rule.sh`, which grants
 the daemon user access only to that SD LUN and sets `UDISKS_IGNORE=1` for the
 Pi's exported storage. The runtime adapter still refuses mounted media and
 never automatically unmounts it.
@@ -170,7 +170,7 @@ returned the recovery strap to Normal, and reached a fresh UART readiness
 marker. The unprivileged daemon owns the complete workflow; neither a root
 daemon nor interactive sudo is needed for a run after installing device rules.
 The run journal, verify JSON, and raw UART remain under
-`local/polis-sbc-controller-state/`.
+`.local/polis-sbc-controller-state/`.
 
 **Automatic recovery from an unbootable image is hardware verified.** Run
 `1791588593195-49dcd2e8611ed958` flashed a copy of `well-known` with only its
@@ -207,7 +207,7 @@ answered `POLIS_USB_OK uptime=145.23` after three seconds. Thus the power-contro
 path is not currently removing Pi operating power. Supply routing, remaining
 power feeds, and switch operation need checking; the precise cause is not yet
 determined. No fresh `get_throttled` result was obtained and no image was flashed
-during this follow-up. Logs are in `local/polis-recovery/dedicated-supply-*`.
+during this follow-up. Logs are in `.local/polis-recovery/dedicated-supply-*`.
 At that point the dedicated supply and recovery cold boots were not qualified.
 
 The user then confirmed an accidental direct 5 V feed bypassing the switch and

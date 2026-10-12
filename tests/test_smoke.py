@@ -183,7 +183,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(rows[0]["target"], "init")
 
     def test_benchmark_excludes_failed_times_and_keeps_distinct_sessions(self):
-        report = dict(source=str(self.root / "output/board"), expect="POLIS_SMOKE_READY services",
+        report = dict(source=str(self.root / ".output/board"), expect="POLIS_SMOKE_READY services",
                       runs=[dict(status="timeout", seconds=1.0)])
         results = self.root / "failed"
         path = smoke.record_benchmark(self.root, results, report)
@@ -226,7 +226,7 @@ class SmokeTest(unittest.TestCase):
 
     def test_default_interactive_menu_selects_snapshots(self):
         source = self.source()
-        collection = self.root / "snapshots"
+        collection = self.root / ".snapshots"
         collection.mkdir()
         source.rename(collection / "ready")
         with patch.object(cli, "REPO", self.root), patch("sys.stdin.isatty", return_value=True), \
@@ -283,11 +283,11 @@ class SmokeTest(unittest.TestCase):
     def test_snapshot_discovery_excludes_outputs_incomplete_and_empty_images(self):
         source = self.source()
         ctx = Context(self.root, self.root, self.root, self.root)
-        (self.root / "output/images").mkdir(parents=True)
-        (self.root / "output/images/sdcard.img").write_bytes(b"working build")
+        (self.root / ".output/images").mkdir(parents=True)
+        (self.root / ".output/images/sdcard.img").write_bytes(b"working build")
         self.assertEqual(snapshots.completed(ctx), [source.name])
         with self.assertRaises(UserError):
-            snapshots.source_for(ctx, "output")
+            snapshots.source_for(ctx, ".output")
         with self.assertRaises(UserError):
             snapshots.source_for(ctx, "../" + source.name)
         (source / ".incomplete").touch()
@@ -302,7 +302,7 @@ class SmokeTest(unittest.TestCase):
         for option in ("--board", "--output", "--source-output"):
             with self.subTest(option=option), contextlib.redirect_stderr(StringIO()), \
                     self.assertRaises(SystemExit) as error:
-                cli.parser().parse_args(["smoke", option, "output/foo"])
+                cli.parser().parse_args(["smoke", option, ".output/foo"])
             self.assertEqual(error.exception.code, 2)
 
 

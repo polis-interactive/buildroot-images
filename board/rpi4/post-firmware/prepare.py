@@ -65,7 +65,7 @@ def main():
     mcopy = str(args.mcopy) if args.mcopy else shutil.which("mcopy")
     if not mcopy:
         raise SystemExit("mcopy is required; install mtools or supply --mcopy from a completed profile build")
-    tools = ROOT / "local/usbboot/rpi-eeprom"
+    tools = ROOT / ".local/usbboot/rpi-eeprom"
     source = tools / "firmware-2711/old/stable/pieeprom-2025-11-05.bin"
     if sha(source) != SOURCE_SHA:
         raise SystemExit("Pinned firmware source hash mismatch")

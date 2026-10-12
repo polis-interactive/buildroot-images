@@ -105,10 +105,10 @@ Negative delta means a lower observed median; it is not by itself evidence of a 
 
 ## Common baseline and fixture
 
-Original benchmark image: `snapshots/polis_rpi4_musl_erofs-benchmark-v1/images/sdcard.img`.
+Original benchmark image: `.snapshots/polis_rpi4_musl_erofs-benchmark-v1/images/sdcard.img`.
 SHA-256: `5e3dc56590f3af34018c65c9750bee9f5b0f221284180f068d3502813a6f7665`.
 
-Preserved automatic-recovery image: `snapshots/polis_rpi4_musl_erofs-well-known/images/sdcard.img`.
+Preserved automatic-recovery image: `.snapshots/polis_rpi4_musl_erofs-well-known/images/sdcard.img`.
 SHA-256: `847af678eb5e732c61322d64d2c7362489f7f4b58b1a4b886211b14dd5acece3`.
 This fallback lacks current benchmark/capture instrumentation. Never substitute
 its boot time for a candidate score or automatically replace it with a winner.
@@ -168,7 +168,7 @@ warnings occurred. Existing `regulatory.db` warnings persisted; Wi-Fi associatio
 was not tested. Original firmware/EEPROM versions and instrumentation above
 were identical across measured boots.
 
-Candidate: `snapshots/polis_rpi4_musl_erofs-prelinux-gzip-v2/images/sdcard.img`;
+Candidate: `.snapshots/polis_rpi4_musl_erofs-prelinux-gzip-v2/images/sdcard.img`;
 SHA-256 `490f5f2baa13b1838ca08875fbe3009b7a842a86ef75ae617198e3454f3a91a3`.
 Packaging v1 was never flashed; v2 corrected an incidental file-order change.
 Source was reverted and original benchmark-v1 restored with complete readback
@@ -183,7 +183,7 @@ installed-image provenance comes from the flash journal, not the output folder.
 | Baseline restoration / A2 | `1791597126874-153800d89dfd59d1` / `1791597245856-5326ed349347c62a` |
 
 Detailed local report, exact reverted patch, hashes, captures and outlier analysis:
-`local/polis-recovery/experiment-20261009-prelinux-01/`.
+`.local/polis-recovery/experiment-20261009-prelinux-01/`.
 
 **Interaction hypotheses, untested:** payload size/content and compression level
 change the transfer/decompression balance. Slower storage could favor gzip;
@@ -216,7 +216,7 @@ Potential interactions, untested: LCD detection, HDMI hotplug and framebuffer
 allocation may share firmware display setup. Their effects may overlap rather
 than add. Keep separate entries for individual and combined tests.
 
-Evidence directory: `local/polis-recovery/experiment-20261009-prelinux-02/`.
+Evidence directory: `.local/polis-recovery/experiment-20261009-prelinux-02/`.
 
 ## Earlier hypothesis backlog (before P03/P04)
 
@@ -249,7 +249,7 @@ are recorded separately, not mixed into a new baseline.
 The setting was active and LCD pin messages disappeared, but the config-to-
 restart gap remained around half a second. The long sample is included and
 localized using the firmware's own first-message-to-ARM interval in
-`local/polis-recovery/experiment-20261009-prelinux-02/result.json`.
+`.local/polis-recovery/experiment-20261009-prelinux-02/result.json`.
 No additional baseline batch was run after the user's instruction to reuse
 controls. Five valid boots passed the same UART, capture/hash, mount and
 startup checks as P01; no recovery or power warnings. No fresh power-flag or
@@ -279,7 +279,7 @@ path, firmware variant, memory split, clock, kernel or DT overlay is removed.
 Use saved P02 baseline five-boot median 7.349673 s as the primary comparison;
 original qualified and P01 measurements remain context for variability.
 Potential display-setting interactions remain untested. Evidence:
-`local/polis-recovery/experiment-20261009-prelinux-03/`.
+`.local/polis-recovery/experiment-20261009-prelinux-03/`.
 
 ## P03 measured outcome
 
@@ -322,7 +322,7 @@ The gain is attributable to the bundle only; individual components and their
 interaction with gzip remain untested. Size optimization can also change
 post-entry runtime performance, which this timing metric does not measure.
 
-Evidence: `local/polis-recovery/experiment-20261009-prelinux-04/`. An unexpected
+Evidence: `.local/polis-recovery/experiment-20261009-prelinux-04/`. An unexpected
 rootfs/diagnostic dependency can prevent boot. Preserve existing recovery and
 stop this batch if it activates. Record the final effective Kconfig delta.
 
@@ -412,7 +412,7 @@ real Pi boot/capture/power validation.
 Prototype: 10,621,440 raw bytes -> 5,138,486 compressed bytes; complete loader
 payload 5,146,688 bytes. The decompressed SHA-256 remains P04's
 `20c9d62b7371ceba4a0de388f1007d17256abedcbe47b0fa59a28f6216b22b74`.
-Evidence: `local/polis-recovery/experiment-20261009-prelinux-05/`. Risks include
+Evidence: `.local/polis-recovery/experiment-20261009-prelinux-05/`. Risks include
 firmware placement and cache/entry-state assumptions; one automatic recovery
 ends this batch. P01 firmware-gzip results cannot predict ARM-LZ4 performance.
 
@@ -502,7 +502,7 @@ no-error-file check. Never treat an absent timing as zero or suppress its error.
 Potential interactions: changed GPU memory split and firmware initialization
 may affect DT fixups and ARM entry, including the P05 loader. These are part
 of this firmware variant, not separate attributed wins. Evidence:
-`local/polis-recovery/experiment-20261009-prelinux-06/`.
+`.local/polis-recovery/experiment-20261009-prelinux-06/`.
 
 ### P06 measured outcome
 
@@ -567,7 +567,7 @@ other nodes changed. The firmware still fills the overlay's empty UART pin
 properties at boot; normal UART/USB validation is required before timing.
 Potential interaction with cut-down firmware remains a hypothesis; compare
 against P06 as well as the common baseline, without assuming additive savings.
-Evidence: `local/polis-recovery/experiment-20261009-prelinux-07/`.
+Evidence: `.local/polis-recovery/experiment-20261009-prelinux-07/`.
 
 ### P07 measured outcome
 
@@ -619,7 +619,7 @@ USB initialization, but does not isolate the earlier time spent probing USB.
 The printed timestamp fractions are not used to derive durations here.
 Source config was restored and original clean P07 reinstalled and verified in
 run `1791601275458-35c04ab09d15cfc8`; no baseline batch was repeated.
-Evidence: `local/polis-recovery/diagnostic-20261009-early-boot/`.
+Evidence: `.local/polis-recovery/diagnostic-20261009-early-boot/`.
 
 ## P08 Disable bootloader network-installer probing
 
@@ -662,7 +662,7 @@ The first preparation attempt caught read-only permissions inherited from the
 snapshot copy before any fixture action; preparation now makes only its copied
 files owner-writable. Failed local artifacts remain preserved.
 
-Evidence: `local/polis-recovery/experiment-20261009-prelinux-08/`. Potential
+Evidence: `.local/polis-recovery/experiment-20261009-prelinux-08/`. Potential
 interaction: removing early bootloader work may reduce the large pre-trace
 outliers, but five boots alone cannot establish that it eliminates them. The
 same SD image hash must henceforth be paired with its EEPROM configuration.
@@ -746,7 +746,7 @@ Potential antagonism: loading filesystem padding and copying files from RAM
 may cost more than ordinary file reads. Potential synergy: prior LZ4 compression
 and premerged overlays let the entire required boot filesystem fit into 6 MiB.
 These mechanisms are hypotheses until measured. Evidence and original genimage
-config: `local/polis-recovery/experiment-20261009-prelinux-09/`.
+config: `.local/polis-recovery/experiment-20261009-prelinux-09/`.
 
 ### P09 measured outcome
 
@@ -810,7 +810,7 @@ single-bit corruptions, and 512 random/instruction-heavy BCJ round-trips with
 unaligned tails. QEMU decoded the actual kernel body and passed the independent
 checksum/EL2/cache-off/DTB/reserved-argument verifier; unsupported EL1 was
 rejected. These are correctness checks, not Pi timing measurements.
-Evidence: `local/polis-recovery/experiment-20261009-prelinux-10/`.
+Evidence: `.local/polis-recovery/experiment-20261009-prelinux-10/`.
 
 Potential synergy: stronger compression reduces the entire sequential boot.img
 read. Potential antagonism: decoder instruction footprint, Zstd computation,
@@ -958,7 +958,7 @@ Potential synergy: reduced compressed I/O, less ARM decoding work and less
 RAM boot filesystem padding. Potential antagonism: extra demand-loaded module
 work after entry, or a filesystem/module dependency failure. Those must not
 be hidden by the pre-Linux score. All cold-boot outliers will be retained.
-Evidence: `local/polis-recovery/experiment-20261009-prelinux-11/`.
+Evidence: `.local/polis-recovery/experiment-20261009-prelinux-11/`.
 
 Final candidate snapshot: `polis_rpi4_musl_erofs-prelinux-pi4-kernel-v2`.
 SD SHA-256: `4264087a49096d1a36a484ab37d7412503101a7ff9e2258758ec8840f82944ba`.
@@ -1025,7 +1025,7 @@ reads. No EEPROM/clock/voltage/OTP/wiring or benchmark changes. UART 115200 and
 1000 ms power-off interval remain. Five cold boots will be compared with saved
 P09; include all failures/outliers and stop after any automatic recovery.
 
-Evidence and candidate: `local/polis-recovery/experiment-20261009-prelinux-12/`.
+Evidence and candidate: `.local/polis-recovery/experiment-20261009-prelinux-12/`.
 Candidate SD SHA-256:
 `bb2a5b36c011663a89a69b902ee4459f7a1ebe2564891ebd709bfd94361bc015`.
 P09 boot.img SHA-256 remains
@@ -1070,7 +1070,7 @@ SHA-256 `4322c8d87d421030dbbede3ec13bd7bfca01e8378f8d10fe168c1a9934063a8d`.
 Normal UART/USB capture, a single entry marker, unchanged Pico counters,
 P09 kernel version, firmware/EEPROM configuration, four CPUs at EL2, Wi-Fi
 firmware load, services and EROFS/ext4 mounts passed the restoration checks.
-Evidence: `local/polis-recovery/experiment-20261009-prelinux-12/restored-validation.json`.
+Evidence: `.local/polis-recovery/experiment-20261009-prelinux-12/restored-validation.json`.
 This was a restoration check, not another baseline batch.
 
 Active kernel fragment and genimage configuration match their saved P09

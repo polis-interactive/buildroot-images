@@ -1,6 +1,7 @@
 schema = 1
 id = "no-ethernet"
 description = "Remove Ethernet support."
+disables = ["ethernet"]
 
 [kernel]
 "CONFIG_ETHERNET" = "n"

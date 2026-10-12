@@ -2,7 +2,7 @@
 # Config-path values follow Buildroot's path convention (relative to Buildroot).
 schema = 1
 includes = ["package/*/build.toml", "build-support/static-core/build.toml"]
-exclude = ["target", ".git", "__pycache__", "*.pyc"]
+exclude = ["target", ".target", ".git", "__pycache__", "*.pyc"]
 
 [variables]
 BR2_EXTERNAL_POLIS_PATH = "{repo}"
@@ -10,7 +10,7 @@ TOPDIR = "{buildroot}"
 BASE_DIR = "{output}"
 
 [defaults]
-inputs = ["{buildroot}/Makefile", "external.mk", "src/build", "src/common.py", "profiles", "src/profiles"]
+inputs = ["{buildroot}/Makefile", "external.mk", "src/build", "src/common.py", "profiles/buildroot.lock.json", "src/profiles"]
 config = ["BR2_ARCH*", "BR2_aarch64", "BR2_ARM*", "BR2_cortex*", "BR2_TOOLCHAIN*", "BR2_GCC*", "BR2_TARGET_OPTIMIZATION", "BR2_TARGET_LDFLAGS", "BR2_SHARED*", "BR2_STATIC*", "BR2_ENABLE_DEBUG", "BR2_DEBUG*", "BR2_OPTIMIZE*", "BR2_REPRODUCIBLE"]
 
 [[steps]]

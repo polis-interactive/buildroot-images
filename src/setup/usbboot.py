@@ -36,7 +36,7 @@ def verify(path, revision, eeprom_revision):
 
 def install(repo, *, url=URL, revision=REVISION, eeprom_revision=EEPROM_REVISION):
     prerequisites()
-    local = repo / 'local'
+    local = repo / '.local'
     local.mkdir(parents=True, exist_ok=True)
     target = local / 'usbboot'
     with (local / '.usbboot-setup.lock').open('a') as lock:

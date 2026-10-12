@@ -5,7 +5,7 @@ ARGS ?=
 CARGO ?= cargo
 PICOTOOL ?= picotool
 SBC_CONTROLLER_FIXTURE ?= bench-rpi4b
-SBC_CONTROLLER_SOCKET ?= $(CURDIR)/local/polis-sbc-controller-state/daemon.sock
+SBC_CONTROLLER_SOCKET ?= $(CURDIR)/.local/polis-sbc-controller-state/daemon.sock
 PICO_SERIAL ?=
 SBC_CONTROLLER_USER ?= $(shell id -un)
 shell_quote = '$(subst ','"'"',$(1))'
@@ -45,10 +45,10 @@ ifeq ($(filter $(COMMANDS) $(SBC_CONTROLLER_COMMANDS),$(MAKECMDGOALS)),)
 		'  make setup-permissions  Install host udev rules and enroll SBC_CONTROLLER_USER via sudo' \
 		'  make test         Run host tests' \
 		'  make clean        Delete .cache/ and dl/ (downloads will be fetched again)' \
-		'  make purge        Delete output/, local/usbboot/, local/polis-sbc-controller-tools/ (restore tools with make setup)' ''
+		'  make purge        Delete .output/, .local/usbboot/, .local/polis-sbc-controller-tools/ (restore tools with make setup)' ''
 	@printf '%s\n' 'SBC controller commands:' \
-		'  make sbc-controller-flash   Build, flash, verify, and start Pico firmware using picotool' \
-		'  make sbc-controller-daemon  Build and run the host daemon in the foreground' \
+		'  make sbc-controller-flash   Build in package/polis-sbc-controller/.target/, flash, verify, and start Pico firmware' \
+		'  make sbc-controller-daemon  Build in package/polis-sbc-controller/.target/ and run the host daemon in the foreground' \
 		'  make sbc-controller-usb-test  Check direct laptop/Pi USB data exchange' \
 		'  make sbc-controller-diagnostics  Archive current Pi boot logs over USB' \
 		'  make sbc-controller-benchmark  Run five cold boots; reject provisioning boots or missing setup status' \
@@ -66,12 +66,13 @@ sbc-controller-flash:
 ifneq ($(strip $(SBC_CONTROLLER_HELP)),)
 	@printf '%s\n' 'Usage: make sbc-controller-flash [PICO_SERIAL=BOOTSEL_SERIAL] [PICOTOOL=/path/to/picotool] [CARGO=/path/to/cargo]' \
 		'Builds Pico 2 W firmware, writes it with picotool, verifies it, and starts it.' \
+		'Build artifacts: package/polis-sbc-controller/.target/.' \
 		'Put the Pico 2 W in BOOTSEL mode first. Flashing resets it and switches Pi power off.' \
 		'PICO_SERIAL selects a specific Pico when multiple devices are attached.' \
 		'Docs: package/polis-sbc-controller/README.md'
 else
-	cd package/polis-sbc-controller && $(CARGO) firmware --locked --target-dir target
-	$(PICOTOOL) load -v -x -t elf package/polis-sbc-controller/target/thumbv8m.main-none-eabihf/firmware/polis-sbc-controller-firmware $(if $(PICO_SERIAL),--ser "$(PICO_SERIAL)")
+	cd package/polis-sbc-controller && $(CARGO) firmware --locked --target-dir .target
+	$(PICOTOOL) load -v -x -t elf package/polis-sbc-controller/.target/thumbv8m.main-none-eabihf/firmware/polis-sbc-controller-firmware $(if $(PICO_SERIAL),--ser "$(PICO_SERIAL)")
 endif
 
 sbc-controller-usb-test:
@@ -89,32 +90,34 @@ ifneq ($(strip $(SBC_CONTROLLER_HELP)),)
 	@printf '%s\n' 'Usage: make sbc-controller-cli ARGS="status | console-read | ..."' \
 		'       make sbc-controller-diagnostics' \
 		'       make sbc-controller-benchmark [ARGS="--samples 3"]' \
+		'CLI binary: package/polis-sbc-controller/.target/debug/polis-sbc-controller.' \
 		'Diagnostics reads the current boot capture. Benchmark cycles power (default: 5 boots); it never flashes.' \
 		'Requires the running daemon, schema-3 Pico firmware, and rebuilt diagnostic profile for benchmarks.' \
 		'Build hardware-debug images with make image ARGS="--profile polis-rpi4-speed --development" to skip first-boot setup.' \
 		'Status reports progress and artifact paths. Never replay a benchmark after an ambiguous reply.'
 else
-	cd package/polis-sbc-controller && $(CARGO) build --locked --target-dir target -p polis-sbc-controller
-	package/polis-sbc-controller/target/debug/polis-sbc-controller --socket "$(SBC_CONTROLLER_SOCKET)" --fixture "$(SBC_CONTROLLER_FIXTURE)" $(if $(filter sbc-controller-diagnostics,$@),diagnostics,$(if $(filter sbc-controller-benchmark,$@),benchmark --confirm-fixture "$(SBC_CONTROLLER_FIXTURE)")) $(ARGS)
+	cd package/polis-sbc-controller && $(CARGO) build --locked --target-dir .target -p polis-sbc-controller
+	package/polis-sbc-controller/.target/debug/polis-sbc-controller --socket "$(SBC_CONTROLLER_SOCKET)" --fixture "$(SBC_CONTROLLER_FIXTURE)" $(if $(filter sbc-controller-diagnostics,$@),diagnostics,$(if $(filter sbc-controller-benchmark,$@),benchmark --confirm-fixture "$(SBC_CONTROLLER_FIXTURE)")) $(ARGS)
 endif
 
 sbc-controller-daemon:
 ifneq ($(strip $(SBC_CONTROLLER_HELP)),)
 	@printf '%s\n' 'Usage: make sbc-controller-daemon [CARGO=/path/to/cargo]' \
 		'Builds and runs the host daemon in the foreground; Ctrl-C stops it.' \
+		'Build artifacts: package/polis-sbc-controller/.target/.' \
 		'Connect the flashed Pico over USB; the daemon reconnects automatically.' \
 		'Fixture constants: package/polis-sbc-controller/daemon/src/settings.rs. No config file needed.' \
 		'Docs: package/polis-sbc-controller/docs/host.md'
 else
-	cd package/polis-sbc-controller && $(CARGO) build --locked --target-dir target -p polis-sbc-controller-daemon
-	exec package/polis-sbc-controller/target/debug/polis-sbc-controller-daemon
+	cd package/polis-sbc-controller && $(CARGO) build --locked --target-dir .target -p polis-sbc-controller-daemon
+	exec package/polis-sbc-controller/.target/debug/polis-sbc-controller-daemon
 endif
 
 setup:
 ifneq ($(strip $(COMMAND_HELP) $(filter $(HELP_GOALS),$(ARGS))),)
 	@printf '%s\n' 'Usage: make setup [UV=/path/to/uv]' \
-		'Install Python dependencies, download pinned usbboot/rpi-eeprom into local/usbboot/, and build rpiboot.' \
-		'Prepare the verified RAM recovery payload in local/polis-sbc-controller-tools/gadget/.' \
+		'Install Python dependencies, download pinned usbboot/rpi-eeprom into .local/usbboot/, and build rpiboot.' \
+		'Prepare the verified RAM recovery payload in .local/polis-sbc-controller-tools/gadget/.' \
 		'Requires Git, Make, a C compiler, pkg-config, and libusb development files.' \
 		'Existing clean checkouts at the pinned revisions are reused. No hardware is accessed.'
 else
@@ -141,6 +144,6 @@ clean:
 	@rm -rf -- .cache dl
 
 purge:
-	@rm -rf -- output local/usbboot local/polis-sbc-controller-tools
-	@mkdir -p output
+	@rm -rf -- .output .local/usbboot .local/polis-sbc-controller-tools
+	@mkdir -p .output
 endif
