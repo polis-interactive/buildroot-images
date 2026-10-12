@@ -28,6 +28,13 @@ class SmokeTest(unittest.TestCase):
         return smoke.watch([sys.executable, "-u", "-c", script], self.root / "serial.log",
                            "POLIS_SMOKE_READY services", timeout)
 
+    def test_final_image_cannot_enter_smoke_timing(self):
+        images = self.root / 'images'
+        images.mkdir()
+        (images / 'provisioning.json').write_text(json.dumps(dict(scope='first-boot', enabled=True)))
+        with self.assertRaisesRegex(UserError, '--development'):
+            smoke.boot_inputs(self.root)
+
     def test_split_marker_and_guest_uptime(self):
         result = self.watch("import os, time; os.write(1, b'POLIS_SMOKE_RE'); "
                             "time.sleep(.02); os.write(1, b'ADY services uptime=2.50\\r\\n'); "

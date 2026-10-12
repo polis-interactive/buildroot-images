@@ -130,12 +130,13 @@ class Plan:
     fingerprint: str
     overlays: list
     post_build: list
+    development: bool = False
 
     def enabled(self, group):
         return group.value in self.groups
 
 
-def resolve(ctx: Context, name: str) -> Plan:
+def resolve(ctx: Context, name: str, *, development=False) -> Plan:
     path = profile_path(ctx.repo, name)
     profile = load_profile(path)
     if profile.name != name:
@@ -260,11 +261,13 @@ def resolve(ctx: Context, name: str) -> Plan:
         ('boot-ramdisk', 'boot-layout', 'ramdisk')):
         if group in groups:
             assign('image', key, value, group)
+    if development:
+        assign('firmware', 'bootloader_update', '0', 'erofs-root')
     inputs = input_manifest(ctx, path)
     fingerprint = digest(dict(inputs=inputs, profile=profile.name, groups=ordered,
-                              buildroot=str(ctx.buildroot), repo=str(ctx.repo)))
+                              buildroot=str(ctx.buildroot), repo=str(ctx.repo), development=development))
     plan = Plan(profile, {g: groups[g] for g in ordered}, values, changes, inputs,
-                fingerprint, overlays, post_build)
+                fingerprint, overlays, post_build, development)
     compose_buildroot(plan)
     return plan
 
@@ -305,6 +308,10 @@ def compose_buildroot(plan):
         owners.append(Group.HEADLESS.value)
     if owners:
         assign('BR2_ROOTFS_POST_BUILD_SCRIPT', ' '.join(hooks), owners, 'base-to-profile')
+    assign('BR2_ROOTFS_POST_BUILD_SCRIPT', values['BR2_ROOTFS_POST_BUILD_SCRIPT'] +
+           ' ' + REPO_PATH + 'package/polis-firstboot/install.py', ['erofs-root'])
+    if not plan.development:
+        assign('BR2_PACKAGE_POLIS_FIRSTBOOT', 'y', ['erofs-root'])
 
 
 def write_generated(ctx, plan, output):
@@ -330,5 +337,6 @@ def write_generated(ctx, plan, output):
         lz4=plan.enabled(Group.LZ4_KERNEL), premerge=premerge,
         cutdown=plan.enabled(Group.CUTDOWN_FIRMWARE),
         ramdisk=plan.enabled(Group.BOOT_RAMDISK), eeprom=selected['eeprom'],
+        development=plan.development,
         profile=plan.profile.name, fingerprint=plan.fingerprint), indent=2) + '\n')
     return buildroot

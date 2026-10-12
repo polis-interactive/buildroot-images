@@ -1,7 +1,13 @@
 # Pi 4 EEPROM preparation
 
+This guide covers the optional capture-based host workflow. Final profile images
+also support [default-on first-boot setup](../../../README.md#first-boot-setup),
+which reads the live board configuration. Use `--development` to omit that setup.
+
 The profile's `[eeprom]` assignments determine preparation. `make image` runs
-this stage after assembling the normal SD image and before saving its snapshot.
+this stage only when `--capture DIRECTORY` is supplied, after assembling the
+normal SD image and before saving its snapshot. Ordinary image builds need no
+connected board or saved diagnostics.
 It can also run separately:
 
 ```sh

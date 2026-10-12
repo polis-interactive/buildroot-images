@@ -1,0 +1,4 @@
+# Pinned upstream files, independently checked against the commissioned checkout.
+sha256  dfa8e2a819e0922fc7fd948ef4fa55f44066fa04ccf5da210d880f0b35ad9d1b  rpi-eeprom-config
+sha256  3bf21d52b020a7e76a5fe9903e714a7fb5272c0a3a7bc1c1410f9cf45ed8b933  pieeprom-2025-11-05.bin
+sha256  594b7565fd3ccf8acd4711a2ec1b199181aafbc3426d0bacaa50ef40edbf7c4a  LICENSE

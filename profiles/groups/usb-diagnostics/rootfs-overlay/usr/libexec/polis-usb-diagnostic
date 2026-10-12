@@ -26,7 +26,7 @@ while IFS= read -r request <&3; do
                 continue
             fi
             # Fixed server-side whitelist: no client-selected path or shell.
-            names='boot.log cmdline.txt mountinfo.txt uptime.txt kernel-version.txt
+            names='boot.log cmdline.txt mountinfo.txt uptime.txt kernel-version.txt provisioning.txt
                 dmesg.log dmesg-error.txt firmware.log firmware-error.txt
                 firmware-version.txt firmware-version-error.txt
                 bootloader-config.txt bootloader-config-error.txt

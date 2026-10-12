@@ -1,4 +1,4 @@
-"""Assemble a profile image; EEPROM update files never enter the normal image."""
+"""Assemble an image with a declared first-boot policy; no pre-staged EEPROM writes."""
 import json
 import math
 import os
@@ -95,10 +95,12 @@ def assemble(env=None):
                         '--tmppath', str(build / 'genimage.tmp'), '--inputpath', str(images),
                         '--outputpath', str(images), '--config', str(config)], check=True, env=env)
     provisioning = dict(schema=1, profile=plan['profile'], plan_sha256=plan['fingerprint'],
-                        enabled=bool(plan['eeprom']), settings=plan['eeprom'],
-                        status='unverified' if plan['eeprom'] else 'not-requested',
-                        scope='board-eeprom', prepare_command=f'make prepare-eeprom ARGS="--profile {plan["profile"]}"',
-                        note='Normal SD image contains no EEPROM updater. Disabling this option does not revert an already provisioned board.')
+                        enabled=not plan['development'], settings=plan['eeprom'],
+                        mode='development' if plan['development'] else 'final',
+                        expand_data=not plan['development'],
+                        status='disabled' if plan['development'] else 'pending-first-boot',
+                        scope='first-boot',
+                        note='Target verifies EEPROM settings and expands /data. Development mode does not revert existing board settings.')
     (images / 'provisioning.json').write_text(json.dumps(provisioning, indent=2) + '\n')
     (output / 'profile/image-result.json').write_text(json.dumps(dict(boot_ramdisk_mib=size), indent=2) + '\n')
 

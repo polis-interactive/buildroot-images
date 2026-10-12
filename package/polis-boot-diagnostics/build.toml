@@ -1,9 +1,9 @@
 [[steps]]
 name = "boot-diagnostics-tools"
-when = "BR2_PACKAGE_POLIS_BOOT_DIAGNOSTICS"
+when = "BR2_PACKAGE_BOOT_DIAGNOSTICS_TOOLS"
 targets = ["boot-diagnostics-tools-dirclean", "boot-diagnostics-tools"]
 inputs = ["package/polis-boot-diagnostics/boot-diagnostics-tools"]
-config = ["BR2_PACKAGE_POLIS_BOOT_DIAGNOSTICS*", "BR2_POLIS_PREFER_STATIC"]
+config = ["BR2_PACKAGE_BOOT_DIAGNOSTICS_TOOLS", "BR2_POLIS_PREFER_STATIC"]
 outputs = ["{output}/build/boot-diagnostics-tools-*/.stamp_built", "{output}/target/usr/bin/vclog", "{output}/target/usr/bin/vcgencmd"]
 
 [[steps]]

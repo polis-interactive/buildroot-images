@@ -21,4 +21,5 @@ groups = [
   "lz4-kernel", "cutdown-firmware", "premerge-overlays", "boot-ramdisk",
   "eeprom-no-net-install",
 ]
-# image prepares these EEPROM settings automatically; prepare-eeprom runs that stage alone.
+# Final images apply EEPROM settings at first boot; --development skips setup.
+# prepare-eeprom remains the optional, capture-based host preparation flow.

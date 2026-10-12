@@ -22,7 +22,7 @@ from .usb import discover
 
 MAX_FILE = 2 * 1024 * 1024
 MAX_TOTAL = 8 * 1024 * 1024
-NAMES = {'boot.log', 'gpio.log', 'cmdline.txt', 'mountinfo.txt', 'uptime.txt', 'kernel-version.txt'}
+NAMES = {'boot.log', 'gpio.log', 'cmdline.txt', 'mountinfo.txt', 'uptime.txt', 'kernel-version.txt', 'provisioning.txt'}
 for stem in ('dmesg', 'firmware', 'firmware-version', 'bootloader-config',
              'bootloader-version', 'firmware-config-int', 'firmware-config-str'):
     NAMES.add(stem + ('.log' if stem in ('dmesg', 'firmware') else '.txt'))

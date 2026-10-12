@@ -140,9 +140,16 @@ The implemented boundaries are:
 | Product features | Application/runtime services, Wi-Fi, boot diagnostics, UART/USB diagnostics, benchmark instrumentation |
 | Capability restrictions | Headless configuration, no Ethernet, UART/Bluetooth routing, USB peripheral-only operation, no input, no 32-bit compatibility/containers/alternate storage |
 | Independent optimizations | Compiler size optimization, debug instrumentation trimming, no cron, HAT/PoE probe skips, LZ4 kernel, premerged overlays, boot ramdisk |
-| Board provisioning | EEPROM settings prepared by the image workflow; applied explicitly to hardware |
+| Board provisioning | First-boot EEPROM configuration and `/data` expansion enabled by default; `--development` disables both. Capture-based `prepare-eeprom` / `image --capture` remain optional. |
 
 Use descriptive identifiers; experiment IDs remain only as evidence references.
+The CLI's `--development` mode is an input to the build fingerprint, applies to
+staged configure/build/snapshot/audit as well as image, and uses separate default
+outputs. Output ownership rejects switching modes in an existing build tree.
+The target configuration and `images/provisioning.json` declare the mode;
+automatic snapshots include `final` or `development` in their name.
+First-boot status is captured separately from readiness and excluded from normal
+benchmark samples. See [setup and recovery details](../README.md#first-boot-setup).
 A measured bundle gain does not establish individual gains after splitting it
 into groups. Cut-down firmware, EEPROM settings and boot ramdisk are selected
 by `polis-rpi4-speed`; none is inherited by the base.

@@ -13,7 +13,8 @@ from .resolver import DOMAINS, digest, file_hash, read_kconfig, resolve, write_g
 
 def output_for(ctx, plan, explicit=None):
     # Different input sets never inherit removed packages or old kernel objects.
-    return (explicit or ctx.repo / 'output' / f'{plan.profile.name}-{plan.fingerprint[:12]}').resolve()
+    mode = '-development' if plan.development else ''
+    return (explicit or ctx.repo / 'output' / f'{plan.profile.name}{mode}-{plan.fingerprint[:12]}').resolve()
 
 
 def make_args(ctx, output):
@@ -52,6 +53,9 @@ def render(audit):
     baseline = 'the musl/EROFS/static base' if comparison == 'base-to-profile' else 'upstream Buildroot'
     lines = [f'Profile: {audit["profile"]}', f'Base: {audit["base"]}', f'State: {audit["state"]}',
              f'Plan: {audit["plan_sha256"]}', '', f'Differences from {baseline}:']
+    if 'provisioning' in audit:
+        lines.insert(3, 'First-boot setup: ' + ('enabled (final)' if audit['provisioning']['enabled']
+                                             else 'disabled (development)'))
     for change in audit['changes']:
         if change['comparison'] == comparison:
             lines.append(f'  {change["domain"]}.{change["key"]}: {change["before"]!r} -> {change["after"]!r}'
@@ -61,7 +65,7 @@ def render(audit):
     lines += ['', 'Checks:']
     lines += [f'  {c["id"]}: {c["status"]} — {c["detail"]}' for c in audit['checks']]
     if audit['hardware']:
-        lines += ['', 'Board provisioning (separate from SD image):']
+        lines += ['', 'Board EEPROM settings (verified on the target during provisioning):']
         lines += [f'  {h["key"]}={h["expected"]}: {h["status"]}' for h in audit['hardware']]
     lines += ['', 'audit.json also records base-to-upstream changes and source ownership.',
               'Requested changes are not a claim that all dependency-induced effective changes were attributed.']
@@ -76,6 +80,7 @@ def save_audit(output, audit):
 def new_audit(plan):
     return dict(schema=1, example=False, state='planned', profile=plan.profile.name,
                 base=plan.profile.base.value, resolver='polis-profiles-v1', plan_sha256=plan.fingerprint,
+                provisioning=dict(enabled=not plan.development, mode='development' if plan.development else 'final'),
                 inputs=plan.inputs, groups=[dict(id=name,
                     selected_by='base' if Group(name) in BASE_GROUPS else 'profile', evidence=data.get('evidence', []))
                     for name, data in plan.groups.items()], changes=plan.changes.copy(),
@@ -185,7 +190,7 @@ def build(ctx, plan, output):
         run([*args, 'all'])
         for check in audit['checks'][2:]:
             check.update(status='passed', detail='Buildroot post-build/image hook completed successfully.')
-        if resolve(ctx, plan.profile.name).fingerprint != plan.fingerprint:
+        if resolve(ctx, plan.profile.name, development=plan.development).fingerprint != plan.fingerprint:
             raise UserError('Inputs changed during build; result is not certified')
         assert_current(ctx, plan, output)
         tracker.commit()
@@ -208,7 +213,7 @@ def prepare_eeprom(ctx, plan, output, capture):
         return
     assert_current(ctx, plan, output, built=True)
     result = provision.prepare(ctx, plan.profile.name, capture, build_output=output, resolved=plan)
-    if resolve(ctx, plan.profile.name).fingerprint != plan.fingerprint:
+    if resolve(ctx, plan.profile.name, development=plan.development).fingerprint != plan.fingerprint:
         raise UserError('Inputs changed during EEPROM preparation; result is not certified')
     if result['bundle']:
         result['bundle'] = str(Path(result['bundle']).relative_to(output))
@@ -221,14 +226,14 @@ def prepare_eeprom(ctx, plan, output, capture):
     save_audit(output, audit)
 
 
-def execute(ctx, action, name, explicit=None, snapshot_name=None, *, capture=None):
+def execute(ctx, action, name, explicit=None, snapshot_name=None, *, capture=None, development=False):
     if action == 'audit' and explicit:
         path = explicit.resolve() / 'profile/audit.txt'
         if not path.is_file():
             raise UserError(f'No saved audit at {path}; configure first')
         print(path.read_text())
         return explicit.resolve()
-    plan = resolve(ctx, name)
+    plan = resolve(ctx, name, development=development)
     output = output_for(ctx, plan, explicit)
     if action == 'audit':
         path = output / 'profile/audit.txt'
@@ -238,16 +243,19 @@ def execute(ctx, action, name, explicit=None, snapshot_name=None, *, capture=Non
         return output
     if snapshot_name:
         snapshots.destination_for(ctx, snapshot_name)
-    if action == 'image':
+    # A normal SD image is independent of board-specific EEPROM preparation.
+    prepare_with_image = action == 'image' and capture is not None
+    if prepare_with_image:
         capture = provision.capture_for(ctx, plan, capture)
     with incremental.locked(output):
         if action in ('configure', 'image'):
             configure(ctx, plan, output, display=action == 'configure')
         if action in ('build', 'image'):
             build(ctx, plan, output)
-        if action in ('image', 'prepare-eeprom'):
+        if action == 'prepare-eeprom' or prepare_with_image:
             prepare_eeprom(ctx, plan, output, capture)
         if action in ('snapshot', 'image'):
             assert_current(ctx, plan, output, built=True)
-            snapshots.snapshot(ctx, output, snapshot_name or snapshots.automatic_name(ctx, name))
+            label = name + ('-development' if development else '-final')
+            snapshots.snapshot(ctx, output, snapshot_name or snapshots.automatic_name(ctx, label))
     return output

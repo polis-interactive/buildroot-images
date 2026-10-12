@@ -14,6 +14,7 @@ while [ ! -b /dev/mmcblk0p3 ]; do
 done
 
 mount /data
+/etc/init.d/polis-firstboot
 mkdir -p /data/config
 # Seed package-provided state once, preserving ownership and permissions.
 # Rename only after the copy finishes so a power loss retries the initialization.

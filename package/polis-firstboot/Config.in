@@ -1,0 +1,19 @@
+config BR2_PACKAGE_POLIS_FIRSTBOOT
+	bool "polis-firstboot"
+	depends on BR2_aarch64
+	depends on BR2_USE_MMU
+	depends on BR2_USE_WCHAR
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	depends on !BR2_STATIC_LIBS
+	select BR2_PACKAGE_PYTHON3
+	select BR2_PACKAGE_E2FSPROGS
+	select BR2_PACKAGE_E2FSPROGS_RESIZE2FS
+	select BR2_PACKAGE_UTIL_LINUX
+	select BR2_PACKAGE_UTIL_LINUX_BINARIES
+	select BR2_PACKAGE_UTIL_LINUX_PARTX
+	select BR2_PACKAGE_BOOT_DIAGNOSTICS_TOOLS
+	help
+	  Once-only Pi 4 EEPROM configuration and online /data expansion.
+	  Profile builds enable this by default; --development disables it.
+	  Uses same-release EEPROM firmware, persistent recovery records,
+	  and at most one automatic EEPROM update attempt per settings set.

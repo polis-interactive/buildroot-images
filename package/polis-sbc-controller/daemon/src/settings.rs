@@ -11,6 +11,7 @@ pub const STATE_DIR: &str = "local/polis-sbc-controller-state";
 pub const SOCKET_NAME: &str = "daemon.sock";
 pub const READINESS_MARKER: &str = "POLIS_SMOKE_READY init";
 pub const READINESS_TIMEOUT_S: u64 = 60;
+pub const PROVISIONING_TIMEOUT_S: u64 = 600;
 pub const RECOVERY_TIMEOUT_S: u64 = 60;
 pub const FLASH_TIMEOUT_S: u64 = 1800;
 pub const POWER_OFF_MS: u32 = 1000;

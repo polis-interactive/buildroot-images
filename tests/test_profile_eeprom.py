@@ -74,11 +74,29 @@ class EepromTests(unittest.TestCase):
         self.assertEqual(json.loads((self.output / 'profile/eeprom-result.json').read_text())['status'], 'prepared')
         workflow.assert_current(self.ctx, plan, self.output, built=True)
 
-    def test_no_capture_fails_before_configure_or_build(self):
+    def test_image_without_capture_builds_and_snapshots_without_eeprom_preparation(self):
+        plan = self.built()
+        with patch.object(provision, 'capture_for') as capture, \
+                patch.object(workflow, 'configure') as configure, \
+                patch.object(workflow, 'build') as build, \
+                patch.object(workflow, 'prepare_eeprom') as prepare, \
+                patch.object(snapshots, 'snapshot') as snapshot:
+            workflow.execute(self.ctx, 'image', plan.profile.name, self.output)
+        capture.assert_not_called()
+        prepare.assert_not_called()
+        configure.assert_called_once()
+        build.assert_called_once()
+        snapshot.assert_called_once()
+        audit = json.loads((self.output / 'profile/audit.json').read_text())
+        self.assertTrue(all(item['status'] == 'unverified' for item in audit['hardware']))
+        self.assertFalse((self.output / 'profile/eeprom-result.json').exists())
+
+    def test_explicit_missing_capture_fails_before_configure_or_build(self):
         with patch.object(provision, 'capture_for', side_effect=UserError('missing capture')), \
                 patch.object(workflow, 'configure') as configure, patch.object(workflow, 'build') as build:
             with self.assertRaisesRegex(UserError, 'missing capture'):
-                workflow.execute(self.ctx, 'image', 'polis-rpi4-speed', self.output)
+                workflow.execute(self.ctx, 'image', 'polis-rpi4-speed', self.output,
+                                 capture=self.root / 'missing-capture')
         configure.assert_not_called()
         build.assert_not_called()
 
@@ -96,7 +114,8 @@ class EepromTests(unittest.TestCase):
                 patch.object(workflow, 'prepare_eeprom', side_effect=stage('prepare')), \
                 patch.object(snapshots, 'snapshot') as snapshot:
             with self.assertRaisesRegex(UserError, 'backend failed'):
-                workflow.execute(self.ctx, 'image', 'polis-rpi4-speed', self.output)
+                workflow.execute(self.ctx, 'image', 'polis-rpi4-speed', self.output,
+                                 capture=self.capture())
         self.assertEqual(events, ['configure', 'build', 'prepare'])
         snapshot.assert_not_called()
 

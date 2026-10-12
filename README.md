@@ -10,12 +10,18 @@ Build Raspberry Pi 4 images from two declarative profiles:
 ```sh
 make profiles
 make image ARGS="--profile polis-rpi4-speed"
+# Build-time experiments and hardware debugging: skip first-boot setup.
+make image ARGS="--profile polis-rpi4-speed --development"
 ```
 
-`image` configures, builds, assembles and verifies the SD image, prepares the
-profile's EEPROM changes, and saves a named snapshot. The audit is always saved;
+`image` configures, builds, assembles and verifies the SD image, and saves a
+named snapshot. No connected Pi, running daemon, or saved diagnostics are required.
+Final images enable first-boot EEPROM configuration and `/data` expansion by
+default. `--development` skips both in an isolated build. The audit is always saved;
 the automatic workflow prints its location without displaying all differences.
 No profile is selected implicitly. Omit `--profile` to use the interactive picker.
+
+Planned work is tracked in [TODO.md](TODO.md).
 
 ## Declarative build profiles
 
@@ -29,6 +35,7 @@ and prerequisites must be selected explicitly.
 # Staged configuration displays the audit before compilation.
 make configure ARGS="--profile polis-rpi4-speed"
 make build ARGS="--profile polis-rpi4-speed"
+# Optional board-specific EEPROM preparation, using saved diagnostics:
 make prepare-eeprom ARGS="--profile polis-rpi4-speed"
 make snapshot ARGS="--profile polis-rpi4-speed --name my-speed-image"
 
@@ -57,10 +64,57 @@ checks enforce static core linking. Full attribution of dependency-induced
 configuration changes remains pending; audits state that limitation explicitly.
 See [the profile and audit contract](docs/build-profiles.md).
 
-## EEPROM preparation
+## First-boot setup
 
-`make image` includes preparation automatically. `make prepare-eeprom` runs
-that stage separately for the selected profile:
+Ordinary images expand `/data` to fill the SD card and apply the profile's EEPROM
+settings on the Pi. This works with removable-SD and daemon-controlled flashing;
+building requires no Pi, daemon, or saved diagnostics. Use `--development` on
+`image`, or consistently on staged `configure`, `build`, `snapshot`, and `audit`
+commands, to omit setup. The mode is included in the input hash, output directory,
+automatic snapshot name, audit, and `images/provisioning.json`. Switching modes
+with a reused `--output` is rejected. Development firmware also disables bootloader
+self-update; it does not revert previously installed EEPROM settings.
+
+Setup runs after mounting `/data`, before services. Expansion preserves the first
+two partitions and existing files, uses online ext4 resize, and becomes a no-op
+when the card is full. It also works when no EEPROM settings are selected.
+`make flash ARGS="--expand-data"` remains available; setup detects prior expansion.
+
+EEPROM setup reads the target's configuration and preserves unrelated settings.
+When a change is needed it saves recovery files, stages an update, and reboots
+once. The next boot removes the staged files and verifies the configuration.
+Failed or interrupted updates are never automatically re-staged. Settings already
+matching need no update. Setup currently supports Pi 4 Model B and changes on
+the bundled `2025-11-05` EEPROM release (`57db150d63864d47e6c9071f6b086a5401eb4e92`).
+Other releases can pass when settings already match; changes report unsupported
+firmware instead of upgrading or downgrading it. Conditional overrides of a
+requested key, signed/frozen firmware, and disabled self-update fail explicitly.
+
+Read `/run/polis-provisioning.json` for this boot's status and
+`/data/provisioning/result.json` for the persistent report. Recovery files live
+under `/data/provisioning/<board-serial>/<settings-hash>/`: `before.conf`,
+`before-version.txt`, `after.conf`, `rollback.bin`, `rollback.sig`, and
+`recovery.json`. Rollback is reconstructed same-release firmware, not an EEPROM
+dump. Do not delete `state.json` to retry until the failure and boot-partition
+update files have been inspected. A rollback uses `rollback.bin` as `pieeprom.upd`
+and `rollback.sig` as `pieeprom.sig` on the boot FAT; its timestamp is newer than
+the staged update. Later EEPROM changes may require regenerating the rollback
+with a newer timestamp. Applying rollback or re-arming setup is a manual operation.
+The original partition table is saved under `/data/provisioning/storage/<card-id>/`.
+
+Provisioning status is separate from normal boot readiness. Diagnostic captures
+include `provisioning.txt`; benchmarks reject setup, verification, failed, or
+missing-status boots. Use a development image for hardware iteration. Final
+images include Python, the pinned Raspberry Pi EEPROM configuration tool,
+`resize2fs`, and `partx`; development images omit these setup dependencies.
+The daemon allows up to 600 seconds when it observes provisioning over UART;
+expiry stops the workflow without automatically reflashing the card. QEMU smoke
+timing requires a development snapshot.
+
+## Optional capture-based EEPROM preparation
+
+`make image` builds without capture-based EEPROM preparation. Use `make prepare-eeprom` for
+the selected profile when you have saved board diagnostics:
 
 ```sh
 make prepare-eeprom ARGS="--profile polis-rpi4-base"
@@ -71,9 +125,13 @@ make prepare-eeprom ARGS="--profile polis-rpi4-speed"
 
 The speed profile declares `NET_INSTALL_ENABLED=0`. Preparation uses its built
 normal image and the latest saved diagnostics in `local/polis-sbc-controller-state/captures`.
-Use `--capture DIRECTORY` on `image` or `prepare-eeprom` to select a capture.
-Missing or changed capture evidence fails before the automatic build starts.
-Collect diagnostics with `make sbc-controller-diagnostics` when needed.
+Use `--capture DIRECTORY` on `prepare-eeprom` to select a capture. To include
+EEPROM preparation in an image build and snapshot, explicitly pass
+`make image ARGS="--profile polis-rpi4-speed --capture DIRECTORY"`.
+Only that opt-in workflow validates capture evidence before the build starts.
+Collect new diagnostics with `make sbc-controller-diagnostics` while the daemon
+is running and the Pi is booted and connected. Ordinary image builds do not
+collect or consult diagnostics; board EEPROM settings remain unverified in the audit.
 
 If the saved configuration already matches, preparation records that result.
 Otherwise it creates a separate update SD image, original configuration and
@@ -81,7 +139,8 @@ same-release rollback firmware. The selected bundle, evidence and preparation
 result are hashed and included in the snapshot. A saved capture is historical
 evidence; preparation does not certify the board's current state.
 
-Normal SD images contain no EEPROM updater. Applying a prepared update remains
+SD images contain no pre-staged EEPROM update files; final images prepare them
+on the target only when needed. Applying a separate capture-based bundle remains
 an explicit hardware operation. Deselecting a group does not revert EEPROM
 settings already installed on a board. See the
 [EEPROM preparation and application guide](board/rpi4/post-firmware/README.md).
@@ -149,8 +208,8 @@ included by `external.mk`. A component is
 skipped only when its input contents, permissions, selected configuration,
 dependencies, rule and outputs match. Final assembly and verification always
 run. Each output is locked during workflow operations; failures invalidate
-incremental state. `build` stops after image assembly; `image` also prepares
-EEPROM artifacts and snapshots the result.
+incremental state. `build` stops after image assembly; `image` snapshots the
+result and includes capture-based EEPROM preparation only when `--capture` is supplied.
 
 Rule paths are repository-relative unless absolute. Placeholders are `{repo}`,
 `{buildroot}`, `{profile}` and `{output}`. `config` selects symbols with globs,
@@ -172,8 +231,8 @@ a compact FAT16 ramdisk inside the boot FAT. Its size is derived from the payloa
 `/` is read-only. `/tmp`, `/run` and `/dev/shm` are volatile. `/data` is mounted
 before normal services; `/data/var-lib` supplies persistent `/var/lib`. Package
 state is seeded once, with retry after interruption. Missing/damaged storage
-blocks services and is never silently formatted. `--expand-data` during flashing
-can grow the final data partition to fill the card.
+blocks services and is never silently formatted. Final images grow `/data` on
+first boot; `--expand-data` during flashing is an optional alternative.
 
 The static policy requires BusyBox and the selected core executables to have no
 ELF interpreter or dynamic dependencies. It covers selected iwd, D-Bus, kmod, XZ,
@@ -240,7 +299,8 @@ are excluded from selection. Historical snapshots remain usable as evidence.
 make images
 make devices
 make flash ARGS="--image snapshots/my-speed-image/images/sdcard.img --device /dev/sdX"
-make smoke ARGS="--snapshot my-speed-image --target init --runs 3"
+make image ARGS="--profile polis-rpi4-speed --development --name my-speed-dev"
+make smoke ARGS="--snapshot my-speed-dev --target init --runs 3"
 ```
 
 Flashing requires explicit device confirmation. Check the disk identity before

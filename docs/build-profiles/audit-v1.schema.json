@@ -21,6 +21,15 @@
     "artifacts"
   ],
   "properties": {
+    "provisioning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "mode"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "mode": {"enum": ["final", "development"]}
+      }
+    },
     "schema": {
       "type": "integer",
       "const": 1

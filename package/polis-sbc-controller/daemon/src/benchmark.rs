@@ -4,6 +4,18 @@ use anyhow::{Context, Result, ensure};
 use polis_sbc_controller_embedded_api::{BootMode, Command, Reply, Status};
 use serde_json::{Value, json};
 
+fn validate_provisioning(capture: &Value, boot_id: &str) -> Result<()> {
+    let provisioning = &capture["capture"]["metrics"]["provisioning"];
+    ensure!(
+        provisioning["benchmark_eligible"] == true
+            && provisioning["activity"] == false
+            && (provisioning["status"] == "complete" || provisioning["status"] == "disabled")
+            && (provisioning["enabled"] == false || provisioning["boot_id"] == boot_id),
+        "provisioning boot or missing provisioning status; finish setup or flash a --development image before benchmarking"
+    );
+    Ok(())
+}
+
 fn measurement(before: Status, enabled: Status, final_status: Status) -> Result<Value> {
     let edge = enabled.timing;
     let final_edge = final_status.timing;
@@ -103,6 +115,7 @@ pub async fn execute(parent: &RealBackend, count: u32, journal: &Journal) -> Res
         let boot_id = capture["boot_id"]
             .as_str()
             .context("missing diagnostic boot ID")?;
+        validate_provisioning(&capture, boot_id)?;
         ensure!(
             boot_ids.insert(boot_id.to_owned()),
             "repeated Linux boot ID; Pi did not cold boot"
@@ -158,6 +171,28 @@ pub async fn execute(parent: &RealBackend, count: u32, journal: &Journal) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn provisioning_and_missing_status_are_not_benchmark_samples() {
+        let good = json!({"capture":{"metrics":{"provisioning":{
+            "enabled":true,"boot_id":"boot","status":"complete",
+            "activity":false,"benchmark_eligible":true
+        }}}});
+        assert!(validate_provisioning(&good, "boot").is_ok());
+        assert!(validate_provisioning(&good, "other-boot").is_err());
+        assert!(validate_provisioning(&json!({}), "boot").is_err());
+        for status in ["running", "reboot-required", "failed"] {
+            let mut bad = good.clone();
+            bad["capture"]["metrics"]["provisioning"]["status"] = json!(status);
+            assert!(validate_provisioning(&bad, "boot").is_err());
+        }
+        let mut bad = good.clone();
+        bad["capture"]["metrics"]["provisioning"]["activity"] = json!(true);
+        assert!(validate_provisioning(&bad, "boot").is_err());
+        let dev = json!({"capture":{"metrics":{"provisioning":{
+            "enabled":false,"status":"disabled","activity":false,"benchmark_eligible":true
+        }}}});
+        assert!(validate_provisioning(&dev, "boot").is_ok());
+    }
     use polis_sbc_controller_embedded_api::{Counters, Key, timing::BootTiming};
     fn statuses() -> (Status, Status, Status) {
         let before = Status {

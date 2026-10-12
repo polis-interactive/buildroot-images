@@ -86,6 +86,21 @@ class ProfileBuildTests(unittest.TestCase):
         self.assertEqual(p.values, reverse.values)
         self.assertEqual(p.overlays, reverse.overlays)
 
+    def test_development_mode_is_isolated_and_disables_provisioning(self):
+        final = self.plan()
+        dev = resolver.resolve(self.ctx, 'polis-rpi4-speed', development=True)
+        self.assertNotEqual(final.fingerprint, dev.fingerprint)
+        self.assertNotEqual(workflow.output_for(self.ctx, final), workflow.output_for(self.ctx, dev))
+        self.assertEqual(final.values['buildroot']['BR2_PACKAGE_POLIS_FIRSTBOOT'], 'y')
+        self.assertNotIn('BR2_PACKAGE_POLIS_FIRSTBOOT', dev.values['buildroot'])
+        resolver.write_generated(self.ctx, dev, self.output)
+        image = json.loads((self.output / 'profile/image-plan.json').read_text())
+        self.assertTrue(image['development'])
+        self.assertIn('bootloader_update=0', (self.output / 'profile/config.txt').read_text())
+        self.configure()
+        with self.assertRaisesRegex(UserError, 'another input set'):
+            workflow.configure(self.ctx, dev, self.output, False)
+
     def test_missing_prerequisite_rejected(self):
         with self.assertRaisesRegex(UserError, 'requires explicitly selected group headless'):
             self.plan(groups=[Group.CUTDOWN_FIRMWARE], requires=[])
@@ -177,14 +192,15 @@ class ProfileBuildTests(unittest.TestCase):
         with self.assertRaisesRegex(UserError, 'requested.*effective'):
             workflow.check_values({'CONFIG_STATIC': 'y'}, {}, 'BusyBox', REPO, self.output)
 
-    def test_automatic_flow_hides_audit_and_completes_snapshot(self):
+    def test_image_with_capture_prepares_eeprom_and_completes_snapshot(self):
         with patch.object(workflow, 'configure') as configure, \
                 patch.object(workflow, 'build') as build, \
                 patch.object(workflow, 'assert_current'), \
                 patch.object(provision, 'capture_for', return_value=self.root / 'capture'), \
                 patch.object(workflow, 'prepare_eeprom') as prepare, \
                 patch.object(workflow.snapshots, 'snapshot') as snapshot:
-            workflow.execute(self.ctx, 'image', 'polis-rpi4-speed', self.output, 'speed')
+            workflow.execute(self.ctx, 'image', 'polis-rpi4-speed', self.output, 'speed',
+                             capture=self.root / 'capture')
             self.assertFalse(configure.call_args.kwargs['display'])
             build.assert_called_once()
             prepare.assert_called_once_with(self.ctx, unittest.mock.ANY, self.output, self.root / 'capture')

@@ -17,6 +17,8 @@ def metrics(path: Path) -> dict:
         file = path / name
         return file.read_text(errors="replace") if file.is_file() else ""
 
+    provisioning = read('provisioning.txt')
+    provisioning = json.loads(provisioning) if provisioning else None
     gpio = read("gpio.log")
     ready = next((line for line in gpio.splitlines() if line.startswith("POLIS_GPIO_READY ")), "")
     fields = dict(re.findall(r"(\w+)=([^\s]+)", ready))
@@ -36,7 +38,7 @@ def metrics(path: Path) -> dict:
         if arm is not None:
             post_load = arm - rows[loaded][0]
     version = read("firmware-version.txt")
-    return dict(kernel=kernel, firmware="cutdown" if "(start_cd)" in version else
+    return dict(provisioning=provisioning, kernel=kernel, firmware="cutdown" if "(start_cd)" in version else
                 "standard" if "(start)" in version else "unknown",
                 first_firmware_s=rows[0][0] if rows else None, arm_s=arm,
                 kernel_read_window_s=read_window, after_load_s=post_load,
@@ -111,6 +113,10 @@ def report(archive: Path, source: Path | None = None, label: str | None = None) 
         return 'n/a' if value is None else f'{value:.3f}s'
     for row in sorted(rows, key=lambda data: data['imported_utc']):
         m = row['metrics']
+        provisioning = m.get('provisioning')
+        if provisioning and not provisioning.get('benchmark_eligible', False):
+            print(f'{row["label"]}: provisioning {provisioning.get("status", "unknown")} — excluded from timing comparison')
+            continue
         values = ' | '.join(fmt(m[key]) for key in ('first_firmware_s', 'kernel_read_window_s',
                                                    'after_load_s', 'arm_s', 'linux_ready_s'))
         print(f'{row["label"]} / {m["firmware"]} / {m["kernel"]} | {values}')

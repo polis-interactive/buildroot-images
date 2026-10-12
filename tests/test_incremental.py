@@ -61,7 +61,7 @@ class IncrementalTest(unittest.TestCase):
         self.commands = []
         # Isolate incremental execution; reviewed-plan validation has its own tests.
         self.enterContext(patch.object(builds, 'assert_current'))
-        self.enterContext(patch.object(builds, 'resolve', side_effect=lambda *_: self.plan()))
+        self.enterContext(patch.object(builds, 'resolve', side_effect=lambda *_, **kw: self.plan()))
         self.runner = self.enterContext(patch.object(builds, 'run', side_effect=self.run_make))
         self.enterContext(contextlib.redirect_stdout(StringIO()))
 
@@ -78,7 +78,7 @@ class IncrementalTest(unittest.TestCase):
         fingerprint = hashlib.sha256(self.source.read_bytes() + self.policy.read_bytes()
                                      + self.defconfig.read_bytes()).hexdigest()
         return SimpleNamespace(profile=SimpleNamespace(name='test', base=Base.POLIS_RPI4_V1),
-                               fingerprint=fingerprint, inputs=[], groups={}, changes=[],
+                               fingerprint=fingerprint, inputs=[], groups={}, changes=[], development=False,
                                values={'kernel': {}, 'busybox': {}, 'eeprom': {}})
 
     def build(self):

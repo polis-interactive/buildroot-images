@@ -51,7 +51,7 @@ ifeq ($(filter $(COMMANDS) $(SBC_CONTROLLER_COMMANDS),$(MAKECMDGOALS)),)
 		'  make sbc-controller-daemon  Build and run the host daemon in the foreground' \
 		'  make sbc-controller-usb-test  Check direct laptop/Pi USB data exchange' \
 		'  make sbc-controller-diagnostics  Archive current Pi boot logs over USB' \
-		'  make sbc-controller-benchmark  Run five cold boots with timing and log retrieval' \
+		'  make sbc-controller-benchmark  Run five cold boots; reject provisioning boots or missing setup status' \
 		'  make sbc-controller-cli ARGS=status  Use the shared CLI/MCP frontend' \
 		'' 'Details: make sbc-controller-flash help | make sbc-controller-daemon help' ''
 	@$(UV) run src/main.py
@@ -91,6 +91,7 @@ ifneq ($(strip $(SBC_CONTROLLER_HELP)),)
 		'       make sbc-controller-benchmark [ARGS="--samples 3"]' \
 		'Diagnostics reads the current boot capture. Benchmark cycles power (default: 5 boots); it never flashes.' \
 		'Requires the running daemon, schema-3 Pico firmware, and rebuilt diagnostic profile for benchmarks.' \
+		'Build hardware-debug images with make image ARGS="--profile polis-rpi4-speed --development" to skip first-boot setup.' \
 		'Status reports progress and artifact paths. Never replay a benchmark after an ambiguous reply.'
 else
 	cd package/polis-sbc-controller && $(CARGO) build --locked --target-dir target -p polis-sbc-controller

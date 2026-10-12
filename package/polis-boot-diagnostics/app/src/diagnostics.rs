@@ -64,6 +64,7 @@ fn collect(boot_log: &str) -> Vec<(&'static str, Vec<u8>)> {
         ("mountinfo.txt", "/proc/self/mountinfo"),
         ("uptime.txt", "/proc/uptime"),
         ("kernel-version.txt", "/proc/version"),
+        ("provisioning.txt", "/run/polis-provisioning.json"),
     ] {
         let content = fs::read(source)
             .unwrap_or_else(|error| format!("Could not read {source}: {error}\n").into_bytes());
@@ -162,6 +163,13 @@ pub fn run(boot_log: &str) {
         let result = (|| {
             let mounts = fs::read_to_string("/proc/self/mountinfo")?;
             if !data_is_mounted(&mounts) {
+                return Ok(None);
+            }
+            // First-boot setup runs before services. Do not freeze an early
+            // capture while expansion or EEPROM staging is still in progress.
+            let provisioning =
+                fs::read_to_string("/run/polis-provisioning.json").unwrap_or_default();
+            if provisioning.is_empty() || provisioning.contains("\"status\": \"running\"") {
                 return Ok(None);
             }
             let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
@@ -287,12 +295,14 @@ mod tests {
     fn failed_write_leaves_no_completed_capture_and_can_retry() {
         let data = TestData::new();
         // A nonexistent subdirectory makes the second write fail after boot.log.
-        assert!(save(
-            &data.0,
-            BOOT_ID,
-            &[("boot.log", vec![]), ("missing/file", vec![])]
-        )
-        .is_err());
+        assert!(
+            save(
+                &data.0,
+                BOOT_ID,
+                &[("boot.log", vec![]), ("missing/file", vec![])]
+            )
+            .is_err()
+        );
         assert!(!data.0.join("boot-diagnostics").join(BOOT_ID).exists());
         let path = save(&data.0, BOOT_ID, &[("boot.log", b"retry".to_vec())]).unwrap();
         assert_eq!(fs::read(path.join("boot.log")).unwrap(), b"retry");

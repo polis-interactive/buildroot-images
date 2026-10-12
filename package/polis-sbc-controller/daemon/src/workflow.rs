@@ -411,8 +411,11 @@ impl Backend for RealBackend {
             .await
             .context("missing boot checkpoint")?;
         let needle = self.config.boot.readiness_marker.as_bytes();
+        let provisioning_marker = b"POLIS_PROVISIONING ";
         let mut tail = Vec::new();
-        let deadline = Instant::now() + Duration::from_secs(self.config.boot.readiness_timeout_s);
+        let started = Instant::now();
+        let mut deadline = started + Duration::from_secs(self.config.boot.readiness_timeout_s);
+        let mut provisioning = false;
         loop {
             self.link.require_generation(self.generation)?;
             ensure!(
@@ -423,6 +426,20 @@ impl Backend for RealBackend {
             ensure!(!lost, "UART capture buffer overrun; readiness uncertain");
             cursor = next;
             tail.extend_from_slice(&bytes);
+            if !provisioning
+                && tail
+                    .windows(provisioning_marker.len())
+                    .any(|w| w == provisioning_marker)
+            {
+                provisioning = true;
+                deadline = started + Duration::from_secs(crate::settings::PROVISIONING_TIMEOUT_S);
+                crate::logging::event("[provisioning] target setup observed; waiting up to 600 seconds without automatic reflash".into());
+                tokio::fs::write(
+                    self.run_dir.join("provisioning-observed.txt"),
+                    "Target first-boot setup observed; separate from readiness and timing.\n",
+                )
+                .await?;
+            }
             if tail.windows(needle.len()).any(|w| w == needle) {
                 self.finish_diagnostics(counters).await?;
                 if let Err(error) = self.capture_diagnostics().await {
@@ -433,11 +450,16 @@ impl Backend for RealBackend {
                 self.link.require_generation(self.generation)?;
                 return Ok(true);
             }
-            if tail.len() > needle.len() {
-                tail.drain(..tail.len() - needle.len());
+            let keep = needle.len().max(provisioning_marker.len());
+            if tail.len() > keep {
+                tail.drain(..tail.len() - keep);
             }
             if Instant::now() >= deadline {
                 self.finish_diagnostics(counters).await?;
+                ensure!(
+                    !provisioning,
+                    "provisioning readiness deadline exceeded; inspect setup status, no automatic reflash"
+                );
                 return Ok(false);
             }
             sleep(Duration::from_millis(50)).await;

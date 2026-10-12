@@ -74,6 +74,11 @@ def boot_inputs(source: Path, expect: str = "POLIS_SMOKE_READY init") -> tuple[l
     if (source / ".incomplete").exists():
         raise UserError("Cannot boot an incomplete snapshot.")
     images = source / "images"
+    provisioning = images / 'provisioning.json'
+    if provisioning.is_file():
+        policy = json.loads(provisioning.read_text())
+        if policy.get('scope') == 'first-boot' and policy.get('enabled'):
+            raise UserError('Smoke timing requires a --development image; first-boot setup is enabled in this snapshot.')
     files = [images / name for name in ("sdcard.img", "Image", "bcm2711-rpi-4-b.dtb")]
     cmdline = images / "rpi-firmware/cmdline.txt"
     files.append(cmdline)
