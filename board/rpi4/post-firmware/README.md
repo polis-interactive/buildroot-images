@@ -16,9 +16,9 @@ that setting on the commissioned `bench-rpi4b` with firmware release
 Unfamiliar firmware/configurations fail explicitly.
 
 Preparation uses the profile's built images and the latest imported diagnostics
-under `local/polis-wired-state/captures`. Capture file hashes are checked. Supply
+under `local/polis-sbc-controller-state/captures`. Capture file hashes are checked. Supply
 `--capture DIRECTORY` on `image` or `prepare-eeprom` to choose a saved capture.
-Use `make wired-diagnostics` to collect one from the running commissioned fixture.
+Use `make sbc-controller-diagnostics` to collect one from the running commissioned fixture.
 Preparation itself never accesses hardware.
 
 The standalone command can use explicit paths:
@@ -78,4 +78,4 @@ boot measurements.
 Software-only guard checks:
 `python3 -B board/rpi4/post-firmware/test_steps.py`.
 Historical measurements remain in the
-[pre-Linux runlog](../../../package/polis-wired-control/docs/prelinux-runlog.md).
+[pre-Linux runlog](../../../package/polis-sbc-controller/docs/prelinux-runlog.md).

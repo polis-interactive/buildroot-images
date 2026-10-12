@@ -6,14 +6,14 @@ import sys
 import tempfile
 
 from ..common import UserError
-from ..wired.storage import validate_payload
+from ..sbc_controller.storage import validate_payload
 
 
 def install(repo):
-    source = repo / 'package/polis-wired-control/recovery'
+    source = repo / 'package/polis-sbc-controller/recovery'
     upstream = repo / 'local/usbboot/mass-storage-gadget64'
     expected = (source / 'payload.sha256').read_text().strip()
-    tools = repo / 'local/polis-wired-tools'
+    tools = repo / 'local/polis-sbc-controller-tools'
     tools.mkdir(parents=True, exist_ok=True)
     target = tools / 'gadget'
     with (tools / '.setup.lock').open('a') as lock:

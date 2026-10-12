@@ -108,7 +108,7 @@ class EepromTests(unittest.TestCase):
 
     def test_latest_capture_is_selected_and_base_needs_none(self):
         repo = self.root / 'repo'
-        captures = repo / 'local/polis-wired-state/captures'
+        captures = repo / 'local/polis-sbc-controller-state/captures'
         captures.mkdir(parents=True)
         for name, timestamp in (('z-old', '2026-10-09T00:00:00Z'), ('a-new', '2026-10-10T00:00:00Z')):
             shutil.copytree(self.capture(), captures / name)

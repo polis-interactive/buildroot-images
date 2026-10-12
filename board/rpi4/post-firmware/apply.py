@@ -26,8 +26,8 @@ def execute(directory, args):
     if journal.exists():
         raise SystemExit("Existing apply journal: inspect its recorded workflow; do not replay blindly")
     manifest = json.loads((directory / "manifest.json").read_text())
-    cli = [str(ROOT / "package/polis-wired-control/target/debug/polis-wired"),
-           "--socket", str(ROOT / "local/polis-wired-state/daemon.sock"),
+    cli = [str(ROOT / "package/polis-sbc-controller/target/debug/polis-sbc-controller"),
+           "--socket", str(ROOT / "local/polis-sbc-controller-state/daemon.sock"),
            "--fixture", args.confirm_eeprom_write]
 
     def call(*command):

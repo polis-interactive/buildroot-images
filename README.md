@@ -70,10 +70,10 @@ make prepare-eeprom ARGS="--profile polis-rpi4-speed"
 ```
 
 The speed profile declares `NET_INSTALL_ENABLED=0`. Preparation uses its built
-normal image and the latest saved diagnostics in `local/polis-wired-state/captures`.
+normal image and the latest saved diagnostics in `local/polis-sbc-controller-state/captures`.
 Use `--capture DIRECTORY` on `image` or `prepare-eeprom` to select a capture.
 Missing or changed capture evidence fails before the automatic build starts.
-Collect diagnostics with `make wired-diagnostics` when needed.
+Collect diagnostics with `make sbc-controller-diagnostics` when needed.
 
 If the saved configuration already matches, preparation records that result.
 Otherwise it creates a separate update SD image, original configuration and
@@ -108,20 +108,20 @@ revisions are rejected rather than overwritten. Failed downloads/builds leave
 no installed partial checkout.
 
 Setup also prepares the verified RAM recovery payload in
-`local/polis-wired-tools/gadget/`. Its config, checksum and recipe documentation
-live in [`package/polis-wired-control/recovery/`](package/polis-wired-control/recovery/).
+`local/polis-sbc-controller-tools/gadget/`. Its config, checksum and recipe documentation
+live in [`package/polis-sbc-controller/recovery/`](package/polis-sbc-controller/recovery/).
 Both tool directories are reproducible with `make setup`. Setup does not flash
 devices, provision EEPROM/OTP, or recreate device records or known-good snapshots.
 `local/polis-recovery/` is now historical evidence, with no current runtime dependency.
-UART logs and journals remain in `local/polis-wired-state/`.
+UART logs and journals remain in `local/polis-sbc-controller-state/`.
 `make clean` continues to remove only `.cache/` and `dl/`.
 `make purge` removes all `output/` build directories, `local/usbboot/`, and
-`local/polis-wired-tools/`; run it only when recovery tools are idle, then
+`local/polis-sbc-controller-tools/`; run it only when recovery tools are idle, then
 run `make setup` afterward to restore the tools.
 
-For wired hardware access, run `make setup-permissions` separately. It uses sudo
-to install the tracked [udev policy](package/polis-wired-control/udev/README.md)
-and add your account to `polis-wired`. Use `WIRED_USER=account` to select another
+For SBC controller hardware access, run `make setup-permissions` separately. It uses sudo
+to install the tracked [udev policy](package/polis-sbc-controller/udev/README.md)
+and add your account to `polis-sbc-controller`. Use `SBC_CONTROLLER_USER=account` to select another
 daemon user. Log out and back in before restarting the daemon; reconnect devices
 while the fixture is idle. Permissions follow supported device types across USB
 ports; the daemon retains its explicit fixture/port/serial selection checks.
@@ -160,7 +160,7 @@ needs explicit incremental refresh logic.
 
 Python packages separate responsibilities: `src/profiles` composes and executes
 profiles, `src/build` tracks incremental work, `src/artifacts` handles images and
-snapshots, `src/diagnostics` runs smoke tests, and `src/wired` handles host links.
+snapshots, `src/diagnostics` runs smoke tests, and `src/sbc_controller` handles host links.
 `src/setup` installs downloaded tools and the optional host permissions policy.
 
 ## Storage and static linking
@@ -206,28 +206,28 @@ The collector and its `boot-diagnostics-tools` helper live in
 The former GPIO/LED probe is removed. Old captures remain readable, but new
 captures do not provide GPIO/UART-open readiness measurements.
 
-## Wired test fixture
+## SBC controller test fixture
 
-[`package/polis-wired-control`](package/polis-wired-control/README.md) supplies
+[`package/polis-sbc-controller`](package/polis-sbc-controller/README.md) supplies
 Pico 2 W firmware, a host daemon and CLI/MCP frontend for power, UART, verified
 SD reflashing and recovery. It is separate from the Pi image.
 
-With the Pico in BOOTSEL mode, `make wired-flash` builds, flashes, verifies and
+With the Pico in BOOTSEL mode, `make sbc-controller-flash` builds, flashes, verifies and
 starts its firmware. Resetting the Pico switches Pi power off. `PICO_SERIAL`
-selects a particular Pico. `make wired-daemon` runs the daemon in the foreground.
+selects a particular Pico. `make sbc-controller-daemon` runs the daemon in the foreground.
 
 ```sh
-make wired-cli ARGS=status
-make wired-usb-test
-make wired-diagnostics
-make wired-benchmark ARGS="--samples 5"
+make sbc-controller-cli ARGS=status
+make sbc-controller-usb-test
+make sbc-controller-diagnostics
+make sbc-controller-benchmark ARGS="--samples 5"
 ```
 
 The benchmark cycles Pi power. Fixture configuration is in
-[`daemon/src/settings.rs`](package/polis-wired-control/daemon/src/settings.rs).
-See [host setup](package/polis-wired-control/docs/host.md),
-[recovery prerequisites](package/polis-wired-control/docs/recovery.md) and
-[measurement definitions](package/polis-wired-control/docs/benchmark.md).
+[`daemon/src/settings.rs`](package/polis-sbc-controller/daemon/src/settings.rs).
+See [host setup](package/polis-sbc-controller/docs/host.md),
+[recovery prerequisites](package/polis-sbc-controller/docs/recovery.md) and
+[measurement definitions](package/polis-sbc-controller/docs/benchmark.md).
 
 ## Snapshots, flashing and smoke tests
 
@@ -270,7 +270,7 @@ block devices. Other host tests use temporary files, simulated hardware and
 mocked build commands.
 
 Historical measurements remain in [benchmarks](benchmarks/) and the
-[pre-Linux runlog](package/polis-wired-control/docs/prelinux-runlog.md).
+[pre-Linux runlog](package/polis-sbc-controller/docs/prelinux-runlog.md).
 Experiment identifiers belong to that evidence and manifest `evidence` fields.
 They are not build modes. Changing a profile does not establish a new measured
 boot time; measure the resulting SD image and record its EEPROM configuration.

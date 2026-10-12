@@ -18,13 +18,13 @@ def capture_for(ctx, plan, explicit=None):
     capture = explicit
     if capture is None:
         candidates = []
-        for metadata in (ctx.repo / 'local/polis-wired-state/captures').glob('*/capture.json'):
+        for metadata in (ctx.repo / 'local/polis-sbc-controller-state/captures').glob('*/capture.json'):
             data = json.loads(metadata.read_text())
             candidates.append((data.get('imported_utc', ''), metadata.parent))
         if candidates:
             capture = max(candidates)[1]
     if capture is None:
-        raise UserError('EEPROM preparation needs saved diagnostics: run make wired-diagnostics '
+        raise UserError('EEPROM preparation needs saved diagnostics: run make sbc-controller-diagnostics '
                         'or supply --capture CAPTURE_DIRECTORY')
     capture = capture.resolve()
     metadata = capture / 'capture.json'

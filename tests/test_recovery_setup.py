@@ -7,7 +7,7 @@ import unittest
 
 from src.common import UserError
 from src.setup import recovery
-from src.wired.storage import payload_hash
+from src.sbc_controller.storage import payload_hash
 
 
 class RecoverySetupTests(unittest.TestCase):
@@ -15,7 +15,7 @@ class RecoverySetupTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.repo = Path(temporary.name)
-        source = self.repo / 'package/polis-wired-control/recovery'
+        source = self.repo / 'package/polis-sbc-controller/recovery'
         source.mkdir(parents=True)
         self.upstream = self.repo / 'local/usbboot/mass-storage-gadget64'
         self.upstream.mkdir(parents=True)
@@ -30,7 +30,7 @@ class RecoverySetupTests(unittest.TestCase):
         (self.upstream / 'config.txt').write_bytes((source / 'config.txt').read_bytes())
         self.expected = payload_hash(self.upstream)
         (source / 'payload.sha256').write_text(self.expected + '\n')
-        self.target = self.repo / 'local/polis-wired-tools/gadget'
+        self.target = self.repo / 'local/polis-sbc-controller-tools/gadget'
 
     def test_fresh_setup_and_reuse_without_old_recovery_directory(self):
         recovery.install(self.repo)

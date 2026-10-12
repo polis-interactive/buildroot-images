@@ -12,9 +12,9 @@ import tempfile
 
 from ..common import UserError, run
 
-GROUP = 'polis-wired'
-RULE_NAME = '70-polis-wired.rules'
-RULE_SOURCE = Path(__file__).resolve().parents[2] / 'package/polis-wired-control/udev' / RULE_NAME
+GROUP = 'polis-sbc-controller'
+RULE_NAME = '70-polis-sbc-controller.rules'
+RULE_SOURCE = Path(__file__).resolve().parents[2] / 'package/polis-sbc-controller/udev' / RULE_NAME
 RULES_DIRECTORY = Path('/etc/udev/rules.d')
 REPLACED_RULES = ('70-polis-rpiboot.rules', '70-polis-recovery-storage.rules', '99-polis-tester.rules')
 
@@ -77,7 +77,7 @@ def install(user):
     except KeyError:
         raise UserError(f'No local user {user!r}') from None
     if account.pw_uid == 0:
-        raise UserError('Select the non-root daemon user with WIRED_USER=<name>')
+        raise UserError('Select the non-root daemon user with SBC_CONTROLLER_USER=<name>')
     missing = [tool for tool in ('udevadm', 'groupadd', 'usermod') if not shutil.which(tool)]
     if missing:
         raise UserError('Permission setup requires: ' + ', '.join(missing))

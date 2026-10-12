@@ -59,7 +59,7 @@ class PermissionPolicyTests(unittest.TestCase):
     def test_sd_access_follows_device_type_across_ports_and_serials(self):
         for port, serial in (('1-2.3', 'first-pi'), ('7-9', 'second-pi')):
             result = apply_policy(self.disk(**{'ENV{ID_PATH}': port, 'ENV{ID_SERIAL_SHORT}': serial}))
-            self.assertEqual(result, {'OWNER': 'root', 'GROUP': 'polis-wired', 'MODE': '0660',
+            self.assertEqual(result, {'OWNER': 'root', 'GROUP': 'polis-sbc-controller', 'MODE': '0660',
                                       'ENV{UDISKS_IGNORE}': '1'})
 
     def test_other_disks_or_luns_receive_no_access_or_automount_override(self):
@@ -79,19 +79,19 @@ class PermissionPolicyTests(unittest.TestCase):
     def test_rom_access_is_limited_to_supported_usb_identity(self):
         rom = {'ACTION': 'add', 'SUBSYSTEM': 'usb', 'ENV{DEVTYPE}': 'usb_device',
                'ATTR{idVendor}': '0a5c', 'ATTR{idProduct}': '2711', 'KERNEL': '7-9'}
-        self.assertEqual(apply_policy(rom)['GROUP'], 'polis-wired')
+        self.assertEqual(apply_policy(rom)['GROUP'], 'polis-sbc-controller')
         self.assertEqual(apply_policy({**rom, 'ATTR{idProduct}': '2712'}), {})
         self.assertEqual(apply_policy({**rom, 'ENV{DEVTYPE}': 'usb_interface'}), {})
 
     def test_serial_access_requires_the_polis_device_identity(self):
         pico = {'ACTION': 'change', 'SUBSYSTEM': 'tty', 'KERNEL': 'ttyACM12',
                 'ATTRS{idVendor}': 'c0de', 'ATTRS{idProduct}': 'cafe',
-                'ATTRS{product}': 'Polis Wired Control'}
+                'ATTRS{product}': 'Polis SBC Controller'}
         self.assertEqual(apply_policy(pico)['MODE'], '0660')
         self.assertEqual(apply_policy({**pico, 'ATTRS{product}': 'Other device'}), {})
         pi = {'ACTION': 'add', 'SUBSYSTEM': 'tty', 'KERNEL': 'ttyACM3',
               'ATTRS{product}': 'Polis_Pi_Diagnostics'}
-        self.assertEqual(apply_policy(pi)['GROUP'], 'polis-wired')
+        self.assertEqual(apply_policy(pi)['GROUP'], 'polis-sbc-controller')
         self.assertEqual(apply_policy({**pi, 'KERNEL': 'ttyS0'}), {})
 
     @unittest.skipUnless(shutil.which('udevadm'), 'requires udevadm')
@@ -156,8 +156,8 @@ class PermissionInstallTests(unittest.TestCase):
                 patch.object(permissions, 'run') as run:
             permissions.install('operator')
         commands = [call.args[0] for call in run.call_args_list]
-        self.assertIn(['groupadd', '--system', 'polis-wired'], commands)
-        self.assertIn(['usermod', '--append', '--groups', 'polis-wired', '--', 'operator'], commands)
+        self.assertIn(['groupadd', '--system', 'polis-sbc-controller'], commands)
+        self.assertIn(['usermod', '--append', '--groups', 'polis-sbc-controller', '--', 'operator'], commands)
         self.assertEqual(commands[-1], ['udevadm', 'control', '--reload-rules'])
         self.assertFalse(any('trigger' in command for command in commands))
         self.assertEqual((self.root / permissions.RULE_NAME).read_bytes(), self.data)

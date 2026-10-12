@@ -14,8 +14,8 @@ Publication is atomic; restarting the collector preserves the first completed
 capture for that boot.
 
 The `usb-diagnostics` service transfers these files to the host. It waits for
-`boot.log`; `src/wired/capture.py` validates and archives the transfer for
-`polis-wired-control`. The host also accepts `gpio.log` from older installed
+`boot.log`; `src/sbc_controller/capture.py` validates and archives the transfer for
+`polis-sbc-controller`. The host also accepts `gpio.log` from older installed
 images and historical captures. New captures contain no GPIO timing, so the old
 GPIO readiness metrics are unavailable rather than repurposed as collector timing.
 

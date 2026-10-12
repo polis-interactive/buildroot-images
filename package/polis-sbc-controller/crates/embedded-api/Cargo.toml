@@ -1,0 +1,13 @@
+[package]
+name = "polis-sbc-controller-embedded-api"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+polis-framing.workspace = true
+polis-control-link-protocol.workspace = true
+serde.workspace = true
+heapless.workspace = true
+
+postcard.workspace = true
