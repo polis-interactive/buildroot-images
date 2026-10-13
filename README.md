@@ -5,7 +5,7 @@ Build Raspberry Pi 4 images from declarative profiles:
 | Profile | Contents |
 | --- | --- |
 | [`polis-rpi4-base`](profiles/polis-rpi4-base.toml) | musl toolchain, read-only EROFS root, writable ext4 data, enforced static core linking |
-| [`polis-rpi4-dev`](profiles/polis-rpi4-dev.toml) | Development-only Ethernet DHCP, `polis-dev.local`, key-only SSH, iwd/iwctl, persistent state and application uploads |
+| [`polis-rpi4-dev`](profiles/polis-rpi4-dev.toml) | Development-only Ethernet DHCP, IPv4 mDNS on Ethernet/Wi-Fi (`polis-dev.local`), key-only SSH, iwd/iwctl, persistent state and application uploads |
 | [`polis-rpi4-speed`](profiles/polis-rpi4-speed.toml) | The base plus product services, diagnostics, capability restrictions, kernel/firmware optimizations, and EEPROM network-installer configuration |
 
 ```sh
@@ -25,6 +25,17 @@ No profile is selected implicitly. Omit `--profile` to use the interactive picke
 Build and use the development image with the [development image guide](docs/development-image.md).
 
 Planned work is tracked in [TODO.md](TODO.md).
+
+## License
+
+Original code in this repository is licensed under [MIT](LICENSE-MIT).
+Third-party code, firmware, and packages included in generated images retain
+their own licenses and notices.
+
+## Contributions
+
+External contributions are not currently accepted. Please do not submit pull
+requests. See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution policy.
 
 ## Declarative build profiles
 

@@ -1,0 +1,35 @@
+Subject: [PATCH] network: unregister BSS objects before removing their network
+
+ELL unregisters only the named object, not its descendants. Removing a station
+frees its scan BSS structures after removing the networks, leaving the child
+BasicServiceSet objects registered with dangling pointers. A subsequent
+ObjectManager.GetManagedObjects call can crash in network_bss_property_get_address.
+
+Unregister each network's BSS children before removing the network object.
+This preserves valid property backing data until the objects are unregistered.
+
+Upstream-Status: Pending
+
+--- a/src/network.c
++++ b/src/network.c
+@@ -1909,6 +1909,7 @@
+ static void network_unregister(struct network *network, int reason)
+ {
+ 	struct l_dbus *dbus = dbus_get_bus();
++	const struct l_queue_entry *entry;
+ 
+ 	if (network->connect_after_anqp)
+ 		dbus_pending_reply(&network->connect_after_anqp,
+@@ -1920,6 +1921,12 @@
+ 
+ 	agent_request_cancel(network->agent_request, reason);
+ 	network_settings_close(network);
++
++	/* Removing a parent object does not unregister its BSS children. */
++	for (entry = l_queue_get_entries(network->bss_list); entry;
++			entry = entry->next)
++		l_dbus_unregister_object(dbus,
++			network_bss_get_path(network, entry->data));
+ 
+ 	l_dbus_unregister_object(dbus, network->object_path);
+ 

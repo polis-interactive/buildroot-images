@@ -65,27 +65,48 @@ build. The intended Pi must boot this installed SD image before those checks.
 
 ## Find and connect
 
-The hostname is `polis-dev`. Avahi advertises **`polis-dev.local` on Ethernet**
-using the DHCP-assigned address; there is no fixed IP in the image. mDNS must be
-supported on the client and multicast allowed on the same local network.
+The hostname is `polis-dev`. Avahi advertises **`polis-dev.local` on Ethernet
+(`eth0`) and Wi-Fi (`wlan0`)**, using each interface's current IPv4 address;
+there is no fixed IP in the image. Wi-Fi must already have an address. Avahi
+tracks interface/address changes, including Wi-Fi reconnects. IPv6 transport
+and AAAA publication over IPv4 are disabled. mDNS must be supported on the
+client and multicast allowed on the same local network.
 See [Avahi's mDNS documentation](https://avahi.org/).
 
 ```sh
 getent hosts polis-dev.local
-ssh -i "$BUILDROOT_IMAGES/.local/development-ssh/id_ed25519" root@polis-dev.local
 ```
 
-On Linux, `avahi-resolve-host-name polis-dev.local` can distinguish mDNS discovery
+On Linux, `avahi-resolve-host-name -4 polis-dev.local` can distinguish mDNS discovery
 from a missing resolver integration. If the network blocks mDNS, look for
-`polis-dev` in the router's DHCP leases and pass that address to SSH. Do not add a
-static address to the image. If multiple development Pis are connected, Avahi
-may rename a conflicting host; confirm the intended board's serial before changes.
+`polis-dev` in the router's DHCP leases. If multiple development Pis are connected,
+Avahi may rename a conflicting host; confirm the intended board's serial before changes.
+
+For deterministic **Ethernet SSH**, use the verified Ethernet IPv4 address in
+your ignored development configuration, rather than the shared mDNS name, which
+can now resolve to Wi-Fi. Obtain it from the Ethernet DHCP lease or run
+`ip -4 addr show dev eth0` on an already verified connection. A DHCP reservation
+for the Ethernet MAC keeps this target stable across reboots; otherwise refresh
+the configured address when its lease changes. Keep SSH host-key verification
+enabled. Do not add a static address to the image.
+
+```sh
+PI_HOST='REPLACE_WITH_VERIFIED_ETHERNET_IPV4'
+ssh -4 -i "$BUILDROOT_IMAGES/.local/development-ssh/id_ed25519" "root@$PI_HOST"
+```
+
+Avahi provides name resolution only; application listeners and HTTP hostname
+acceptance are separate integrations.
 
 SSH passwords are disabled at compile time and with `-s`; no login getty is
 started. `/root/.ssh` points to `/data/config/ssh`, and Dropbear host keys are
 created per device under `/data/config/dropbear`. Both survive reboot. The initial
 public key is copied once; subsequent local edits to `authorized_keys` persist.
 Wi-Fi credentials are provisioned only at runtime; none are baked into the image.
+
+The iwd package includes the [station-to-AP cleanup fix](iwd-ap-recovery.md)
+to remove stale BSS objects before their backing memory is freed. That note also
+records package-only Pi validation and the temporary live-update rollback.
 
 ## Hardware acceptance
 
@@ -109,6 +130,13 @@ against the serial shown by `/proc/device-tree/serial-number` before rebooting.
 3. Run `reboot` on the confirmed Pi. Reconnect with the same SSH command and
    normal host-key verification. Record `polis-dev-check` again, a changed boot
    ID, and unchanged marker, D-Bus machine ID and SSH host-key checksums.
+4. From a client on the connected Wi-Fi, resolve `polis-dev.local` with IPv4
+   mDNS and compare the answer with `ip -4 addr show dev wlan0` on the Pi.
+   Repeat after reboot and a Wi-Fi reconnect/address change; verify that the
+   previous address is withdrawn and no IPv6 AAAA endpoint is advertised.
+   Confirm the SSH connection still terminates on `eth0` using the server
+   address (third field) of `$SSH_CONNECTION`. These are hardware checks,
+   not evidence supplied by the host test suite.
 
 `/var/lib` is bound from `/data/var-lib` before services start, so iwd network
 profiles survive reboot. D-Bus machine identity also persists. The application
@@ -128,10 +156,10 @@ Build binaries for `aarch64-unknown-linux-musl` with the recorded compatible
 toolchain. Upload a new file, stop the service, rename it atomically, then start it:
 
 ```sh
-PI_HOST=polis-dev.local
+PI_HOST='REPLACE_WITH_VERIFIED_ETHERNET_IPV4'
 SSH_KEY="$BUILDROOT_IMAGES/.local/development-ssh/id_ed25519"
-scp -O -i "$SSH_KEY" ./your-aarch64-musl-binary "root@$PI_HOST:/data/bin/dev-app.new"
-ssh -i "$SSH_KEY" "root@$PI_HOST" \
+scp -4 -O -i "$SSH_KEY" ./your-aarch64-musl-binary "root@$PI_HOST:/data/bin/dev-app.new"
+ssh -4 -i "$SSH_KEY" "root@$PI_HOST" \
   '/etc/init.d/S90dev-app stop && chmod 755 /data/bin/dev-app.new && mv /data/bin/dev-app.new /data/bin/dev-app && /etc/init.d/S90dev-app start'
 ```
 
