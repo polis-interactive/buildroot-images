@@ -1,0 +1,16 @@
+schema = 1
+id = "wifi-setupd"
+description = "Polis Wi-Fi setup portal with a supplied image password."
+requires = ["wifi-iwd"]
+provides = ["wifi-setup-portal"]
+overlays = ["profiles/groups/wifi-setupd/rootfs-overlay"]
+
+[buildroot]
+"BR2_PACKAGE_POLIS_WIFI_SETUPD" = "y"
+"BR2_PACKAGE_AVAHI" = "y"
+"BR2_PACKAGE_AVAHI_DAEMON" = "y"
+"BR2_PACKAGE_AVAHI_AUTOIPD" = "n"
+
+[busybox]
+"CONFIG_SYSLOGD" = "y"
+"CONFIG_FEATURE_ROTATE_LOGFILE" = "y"

@@ -1,0 +1,8 @@
+schema = 1
+id = "wifi-identity"
+description = "Hostname and login banner for the temporary Wi-Fi appliance profile."
+requires = ["wifi-iwd"]
+
+[buildroot]
+"BR2_TARGET_GENERIC_HOSTNAME" = "polis"
+"BR2_TARGET_GENERIC_ISSUE" = "Polis Wi-Fi image"

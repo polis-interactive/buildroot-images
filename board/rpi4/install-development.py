@@ -16,11 +16,6 @@ def install(target, profile):
         elif path.exists():
             raise RuntimeError(f"Refusing to replace unexpected state directory: {path}")
         path.symlink_to(destination)
-    # Buildroot normally points this at /tmp; keep machine identity persistent.
-    dbus = target / "var/lib/dbus"
-    if dbus.is_symlink():
-        dbus.unlink()
-    dbus.mkdir(parents=True, exist_ok=True)
     key = (profile / "authorized_keys").read_text()
     destination = target / "usr/share/polis-development/authorized_keys"
     destination.parent.mkdir(parents=True, exist_ok=True)

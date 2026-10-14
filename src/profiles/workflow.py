@@ -31,7 +31,7 @@ def generated_hashes(output):
     files = ['defconfig', 'kernel.fragment', 'busybox.fragment', 'config.txt',
              'cmdline.txt', 'image-plan.json']
     result = {f'profile/{name}': file_hash(output / 'profile' / name) for name in files}
-    for name in ('authorized_keys', 'build-inputs.json'):
+    for name in ('authorized_keys', 'build-inputs.json', 'wifi-password'):
         if (output / 'profile' / name).is_file():
             result[f'profile/{name}'] = file_hash(output / 'profile' / name)
     result['.config'] = file_hash(output / '.config')
@@ -134,6 +134,9 @@ def assert_current(ctx, plan, output, built=False):
 
 def configure(ctx, plan, output, display):
     pins = inputs.verify_inputs(ctx, plan)
+    if plan.enabled(Group.WIFI_SETUPD):
+        from .wifi import require_password
+        require_password(plan.wifi_password)
     if plan.enabled(Group.DEVELOPMENT_ACCESS):
         if not plan.ssh_public_key:
             raise UserError('Development image requires an SSH public key; use the image/configure command')

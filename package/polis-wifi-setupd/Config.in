@@ -1,0 +1,25 @@
+config BR2_PACKAGE_POLIS_WIFI_SETUPD
+	bool "polis-wifi-setupd"
+	depends on BR2_aarch64
+	depends on BR2_TOOLCHAIN_USES_MUSL
+	depends on BR2_INIT_BUSYBOX
+	depends on BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS
+	depends on BR2_USE_MMU
+	depends on BR2_USE_WCHAR
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	depends on BR2_TOOLCHAIN_HAS_SYNC_4
+	depends on BR2_TOOLCHAIN_HEADERS_AT_LEAST_4_12
+	depends on !BR2_STATIC_LIBS
+	select BR2_PACKAGE_HOST_RUSTC
+	select BR2_PACKAGE_IWD
+	select BR2_PACKAGE_DBUS
+	select BR2_PACKAGE_READLINE
+	help
+	  Wi-Fi provisioning daemon and browser portal, built from release
+	  0.1.3, with the portal supplied by the matching release asset.
+	  Initial integration supports AArch64 musl with BusyBox init.
+	  Requires persistent /data and /var/lib, iwd network configuration,
+	  Wi-Fi firmware and a supplied image password.
+	  Select the wifi-setupd profile group for the image integration.
+
+	  https://github.com/polis-interactive/wifi-setupd

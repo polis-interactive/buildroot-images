@@ -1,0 +1,38 @@
+#!/bin/sh
+set -eu
+daemon=/usr/bin/wifi-setupd
+pidfile=/run/wifi-setupd.pid
+state=/data/wifi-setupd
+
+running() { start-stop-daemon -K -t -p "$pidfile" -x "$daemon" 2>/dev/null; }
+
+case "${1:-}" in
+    start)
+        running && exit 0
+        mountpoint -q /data && mountpoint -q /var/lib || {
+            echo "wifi-setupd: persistent storage is not mounted" >&2; exit 1;
+        }
+        ssid=$(cat "$state/ssid")
+        [ -s "$state/device-key" ] && [ -s "/var/lib/iwd/ap/$ssid.ap" ] || {
+            echo "wifi-setupd: missing password or AP profile; reprovision the card" >&2; exit 1;
+        }
+        umask 077
+        [ ! -f "$state/daemon.log" ] || mv -f "$state/daemon.log" "$state/daemon.previous.log"
+        start-stop-daemon -S -b -m -o -p "$pidfile" -x "$daemon" \
+            -O "$state/daemon.log" -- --interface wlan0 --ap-profile "$ssid" \
+            --web-root /usr/share/wifi-setupd/web --device-key-file "$state/device-key"
+        ;;
+    stop)
+        start-stop-daemon -K -o -p "$pidfile" -x "$daemon"
+        tries=0
+        while running; do
+            tries=$((tries + 1))
+            [ "$tries" -le 35 ] || { echo "wifi-setupd: still stopping after 35 seconds" >&2; exit 1; }
+            sleep 1
+        done
+        rm -f "$pidfile"
+        ;;
+    restart) "$0" stop; "$0" start ;;
+    status) if running; then echo "wifi-setupd: running"; else echo "wifi-setupd: stopped"; exit 1; fi ;;
+    *) echo "Usage: $0 {start|stop|restart|status}" >&2; exit 1 ;;
+esac

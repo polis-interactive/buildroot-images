@@ -1,5 +1,6 @@
 source "$BR2_EXTERNAL_POLIS_PATH/package/polis-boot-diagnostics/Config.in"
 source "$BR2_EXTERNAL_POLIS_PATH/package/polis-firstboot/Config.in"
+source "$BR2_EXTERNAL_POLIS_PATH/package/polis-wifi-setupd/Config.in"
 source "$BR2_EXTERNAL_POLIS_PATH/package/polis-dtmerge/Config.in.host"
 
 config BR2_POLIS_KERNEL_ENTRY

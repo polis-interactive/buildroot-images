@@ -1,5 +1,28 @@
 # Repository instructions
 
+## Target-image dependencies require explicit authorization
+
+- Do not add ANY dependency to the target/final image without the user's explicit
+  authorization for that dependency. Implicit authorization is not sufficient: requesting a feature,
+  behavior, fix, or integration does not authorize its additional dependencies.
+- This includes target interpreters, tools, libraries, packages, and services,
+  including dependencies pulled in transitively or enabled through Buildroot
+  selections or profile changes. A dependency already used elsewhere still
+  requires approval when newly added to another target image or profile.
+- Host-only dependencies on the local development/build machine are authorized,
+  including build and test tools, provided they do not add dependencies to the
+  target image. Check that distinction before enabling a Buildroot option;
+  a host tool requirement does not authorize selecting its target counterpart.
+- Before adding target dependencies, identify them, explain why they are needed and
+  where they will be installed or used, and ask for explicit approval. Read-only
+  investigation and dependency-free preparation may continue while awaiting
+  approval; do not install, enable, or commit to the dependency in implementation.
+- If additional target dependencies emerge after approval, stop the affected work and
+  request approval for those additions. Approval covers only the dependencies
+  and scope explicitly authorized; do not infer it from a general instruction
+  to proceed. Do not ask again for dependencies already explicitly approved
+  within that same scope.
+
 ## Validate changes; leave builds to the user
 
 - Do not run image, kernel, or toolchain builds unless the user explicitly asks

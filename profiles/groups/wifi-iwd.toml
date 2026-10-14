@@ -3,6 +3,7 @@ id = "wifi-iwd"
 description = "Load Wi-Fi after root mounting; iwd owns IP configuration."
 provides = ["wifi"]
 overlays = ["profiles/groups/wifi-iwd/rootfs-overlay"]
+post_build = ["board/rpi4/install-wifi.py"]
 
 [buildroot]
 "BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI" = "y"

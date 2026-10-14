@@ -51,7 +51,8 @@ class DevelopmentTests(unittest.TestCase):
         plan = self.plan(ssh_public_key=self.key)
         for symbol in ('BR2_REPRODUCIBLE', 'BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_AARCH64_MUSL_STABLE',
                        'BR2_TARGET_ROOTFS_EROFS', 'BR2_PACKAGE_IWD', 'BR2_PACKAGE_DBUS',
-                       'BR2_PACKAGE_READLINE', 'BR2_PACKAGE_DROPBEAR', 'BR2_PACKAGE_AVAHI_DAEMON'):
+                       'BR2_PACKAGE_READLINE', 'BR2_PACKAGE_DROPBEAR', 'BR2_PACKAGE_AVAHI_DAEMON',
+                       'BR2_PACKAGE_POLIS_WIFI_SETUPD'):
             self.assertEqual(plan.values['buildroot'][symbol], 'y', symbol)
         self.assertEqual(plan.values['buildroot']['BR2_TARGET_GENERIC_HOSTNAME'], 'polis-dev')
         self.assertEqual(plan.values['kernel']['CONFIG_BCMGENET'], 'y')
@@ -91,6 +92,13 @@ class DevelopmentTests(unittest.TestCase):
         (target / 'etc/dropbear').symlink_to('/var/run/dropbear')
         (target / 'var/lib').mkdir(parents=True)
         (target / 'var/lib/dbus').symlink_to('/tmp/dbus')
+        # Shared networking preparation runs before the development-only hook.
+        spec = importlib.util.spec_from_file_location('install_wifi', REPO / 'board/rpi4/install-wifi.py')
+        wifi = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(wifi)
+        wifi.install(target)
+        (target / 'var/lib/dbus/machine-id').write_text('existing-machine-id')
+        wifi.install(target)
         output = self.root / '.output'
         resolver.write_generated(self.ctx, self.plan(ssh_public_key=self.key), output)
         module.install(target, output / 'profile')
@@ -99,6 +107,8 @@ class DevelopmentTests(unittest.TestCase):
         self.assertEqual((target / 'root/.ssh').readlink(), Path('/data/config/ssh'))
         self.assertTrue((target / 'var/lib/dbus').is_dir())
         self.assertFalse((target / 'var/lib/dbus').is_symlink())
+        self.assertEqual((target / 'var/lib/dbus/machine-id').read_text(), 'existing-machine-id')
+        self.assertEqual((target / 'var/lib/iwd').stat().st_mode & 0o777, 0o700)
         self.assertEqual((target / 'usr/share/polis-development/authorized_keys').read_text(), development.public_key(self.key))
 
     @unittest.skipUnless(shutil.which('busybox') and shutil.which('cc'), 'needs native BusyBox and C compiler')

@@ -1,0 +1,6 @@
+# Locally computed using Buildroot 2026.08 cargo-post-process (Cargo 1.97.1).
+sha256  2daed610a88bd1f62adce275cf5d451130100ef14d25b45632545a3905ff06da  polis-wifi-setupd-0.1.3-cargo6.tar.gz
+sha256  49a9a61c72fc3992e7f43d3723455c03a21cdd29241866601adc5f5dd8df1870  LICENSE-MIT
+# From the 0.1.3 release .sha256 file; verified against its provenance and asset digest.
+# https://github.com/polis-interactive/wifi-setupd/releases/download/0.1.3/wifi-setupd-web-0.1.3.sha256
+sha256  5dbc40e82b6c2fd64d50c45ec27f23010b97c40b2b4203c12d9a7351098c2568  wifi-setupd-web-0.1.3.tar.gz
