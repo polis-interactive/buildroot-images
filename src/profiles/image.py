@@ -4,7 +4,10 @@ import math
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import tempfile
+
+from .wifi import write_credentials
 
 
 def recipe(images, plan):
@@ -80,6 +83,8 @@ image sdcard.img {
                             'label = "polis-data"\n'
                             '           extraargs = "-U 706f6c69-732d-4465-9665-6c6f706d656e '
                             '-E hash_seed=706f6c69-732d-4465-9665-6c6f706d656e,lazy_itable_init=0,lazy_journal_init=0"')
+    if plan.get('wifi_setup'):
+        text = text.replace('empty = true', 'mountpoint = "/data"')
     return text, inner_size
 
 
@@ -113,10 +118,24 @@ def assemble(env=None):
     config = output / 'profile/genimage.cfg'
     config.write_text(text)
     env['PATH'] = str(host / 'bin') + ':' + str(host / 'sbin') + ':' + env.get('PATH', '')
-    with tempfile.TemporaryDirectory(prefix='polis-genimage-root-') as empty:
-        subprocess.run([str(host / 'bin/genimage'), '--rootpath', empty,
+    with tempfile.TemporaryDirectory(prefix='polis-genimage-root-') as staging:
+        command = [str(host / 'bin/genimage'), '--rootpath', staging,
                         '--tmppath', str(build / 'genimage.tmp'), '--inputpath', str(images),
-                        '--outputpath', str(images), '--config', str(config)], check=True, env=env)
+                        '--outputpath', str(images), '--config', str(config)]
+        if plan.get('wifi_setup'):
+            data = Path(staging) / 'data'
+            # mount-data skips seeding an existing var-lib, so include all the
+            # package-provided state, including the persistent D-Bus directory.
+            shutil.copytree(output / 'target/var/lib', data / 'var-lib', symlinks=True)
+            write_credentials(data, (output / 'profile/wifi-password').read_text())
+            if plan.get('reproducible'):
+                for path in [*data.rglob('*'), data]:
+                    os.utime(path, (epoch, epoch), follow_symlinks=False)
+            # Buildroot already uses host-fakeroot to assign root ownership to
+            # rootfs content. Use it for the seeded data filesystem as well.
+            command = [str(host / 'bin/fakeroot'), '--', 'sh', '-ec',
+                       'chown -h -R 0:0 "$1"; shift; exec "$@"', 'sh', str(data), *command]
+        subprocess.run(command, check=True, env=env)
     provisioning = dict(schema=1, profile=plan['profile'], plan_sha256=plan['fingerprint'],
                         enabled=not plan['development'], settings=plan['eeprom'],
                         mode='development' if plan['development'] else 'final',

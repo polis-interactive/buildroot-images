@@ -1,0 +1,7 @@
+#:schema ../docs/build-profiles/profile-v1.schema.json
+schema = 1
+name = "polis-rpi4-wifi"
+base = "polis-rpi4-v1"
+# Keep this separate until hardware acceptance justifies promoting Wi-Fi to base.
+requires = ["wifi", "wifi-setup-portal"]
+groups = ["wifi-iwd", "wifi-setupd", "wifi-identity", "no-ethernet"]

@@ -6,9 +6,17 @@ An audit is always saved. A complete automatic build prints its location, not
 the differences; staged configuration displays the differences before building.
 
 The CLI consumes [`polis-rpi4-base`](../profiles/polis-rpi4-base.toml),
-[`polis-rpi4-dev`](../profiles/polis-rpi4-dev.toml), and
-[`polis-rpi4-speed`](../profiles/polis-rpi4-speed.toml). The speed profile selects the optimized kernel, firmware, image layout and
-EEPROM settings. Commands and EEPROM preparation are documented in the
+[`polis-rpi4-dev`](../profiles/polis-rpi4-dev.toml),
+[`polis-rpi4-wifi`](../profiles/polis-rpi4-wifi.toml), and
+[`polis-rpi4-speed`](../profiles/polis-rpi4-speed.toml). The Wi-Fi setup profile
+is a temporary non-development image pinned to wifi-setupd 0.1.3 and its release portal; see
+the [package guide](../package/polis-wifi-setupd/README.md).
+The speed profile selects the optimized kernel, firmware, image layout and
+EEPROM settings and excludes Wi-Fi. Base stays minimal pending successful
+Wi-Fi hardware acceptance. Dev selects the same Wi-Fi stack plus Ethernet and
+SSH, retaining its headless settings and separate hostname. These profiles all
+compose groups over `polis-rpi4-v1`; they do not inherit other profile TOML files.
+Commands and EEPROM preparation are documented in the
 [README](../README.md#declarative-build-profiles).
 
 Current implementation: group resolution, owned explicit changes, input hashes,

@@ -1,0 +1,22 @@
+schema = 1
+id = "no-wifi"
+description = "Exclude Wi-Fi drivers, firmware, provisioning and network-discovery services."
+disables = ["wifi", "wifi-setup-portal"]
+
+[buildroot]
+"BR2_PACKAGE_POLIS_WIFI_SETUPD" = "n"
+"BR2_PACKAGE_IWD" = "n"
+"BR2_PACKAGE_WPA_SUPPLICANT" = "n"
+"BR2_PACKAGE_NETWORK_MANAGER" = "n"
+"BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI" = "n"
+"BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI_WIFI" = "n"
+"BR2_PACKAGE_OPENRESOLV" = "n"
+"BR2_PACKAGE_AVAHI" = "n"
+"BR2_PACKAGE_AVAHI_DAEMON" = "n"
+"BR2_PACKAGE_DBUS" = "n"
+
+[kernel]
+"CONFIG_WLAN" = "n"
+"CONFIG_CFG80211" = "n"
+"CONFIG_MAC80211" = "n"
+"CONFIG_BRCMFMAC" = "n"

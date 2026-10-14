@@ -3,16 +3,16 @@
 schema = 1
 name = "polis-rpi4-speed"
 base = "polis-rpi4-v1" # musl + EROFS + enforced static core
-requires = ["boot-diagnostics", "uart-diagnostics", "usb-diagnostics", "wifi"]
+requires = ["boot-diagnostics", "uart-diagnostics", "usb-diagnostics"]
 
 # Order is for readability, not precedence. No silent conflict overrides.
 groups = [
   # Product features and measurement support.
-  "polis-runtime", "boot-diagnostics", "wifi-iwd",
+  "polis-runtime", "boot-diagnostics",
   "uart-diagnostics", "usb-diagnostics", "kernel-entry-marker",
 
   # Explicit capability restrictions; these are not part of the base.
-  "headless", "no-ethernet", "bluetooth-uart-routing", "usb-peripheral-only",
+  "headless", "no-ethernet", "no-wifi", "bluetooth-uart-routing", "usb-peripheral-only",
   "no-input", "no-32bit", "no-containers", "local-storage-only",
 
   # Independently selectable optimizations; evidence remains in the runlog.

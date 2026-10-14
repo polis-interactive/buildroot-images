@@ -5,6 +5,7 @@ import importlib.util
 import io
 import itertools
 import json
+import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -81,6 +82,71 @@ class ProfileBuildTests(unittest.TestCase):
         self.assertEqual(workflow.new_audit(p)['hardware'][0]['expected'], '0')
         self.assertEqual(p.values['kernel']['CONFIG_QUOTA'], 'y')
         self.assertEqual(p.values['kernel']['CONFIG_EXT4_FS'], 'y')
+
+    def test_wifi_profile_is_non_development_and_base_stays_minimal(self):
+        wifi = self.plan('polis-rpi4-wifi')
+        self.assertFalse(wifi.development)
+        self.assertNotIn('development-access', wifi.groups)
+        self.assertNotIn('headless', wifi.groups)
+        self.assertEqual(wifi.values['buildroot']['BR2_PACKAGE_POLIS_FIRSTBOOT'], 'y')
+        for symbol in ('BR2_PACKAGE_IWD', 'BR2_PACKAGE_POLIS_WIFI_SETUPD',
+                       'BR2_PACKAGE_AVAHI_DAEMON'):
+            self.assertEqual(wifi.values['buildroot'][symbol], 'y')
+            self.assertNotIn(symbol, self.plan('polis-rpi4-base').values['buildroot'])
+        self.assertNotIn('BR2_PACKAGE_DROPBEAR', wifi.values['buildroot'])
+        self.assertEqual(wifi.values['buildroot']['BR2_TARGET_GENERIC_HOSTNAME'], 'polis')
+        self.assertEqual(wifi.values['kernel']['CONFIG_ETHERNET'], 'n')
+        self.assertIn('board/rpi4/install-wifi.py', wifi.post_build)
+        self.assertNotIn('board/rpi4/install-development.py', wifi.post_build)
+        self.assertNotIn('etc/init.d/S90dev-app', wifi.values['rootfs'])
+
+    def test_wifi_password_is_a_reviewed_input_without_plaintext_in_audits(self):
+        with patch.dict(os.environ, POLIS_WIFI_SETUP_PASSWORD='image-password123'):
+            first = self.plan('polis-rpi4-wifi')
+            base = self.plan('polis-rpi4-base')
+        with patch.dict(os.environ, POLIS_WIFI_SETUP_PASSWORD='different-password456'):
+            second = self.plan('polis-rpi4-wifi')
+            self.assertEqual(base.fingerprint, self.plan('polis-rpi4-base').fingerprint)
+        self.assertNotEqual(first.fingerprint, second.fingerprint)
+        self.assertNotIn(first.wifi_password, repr(first))
+        self.assertNotIn(first.wifi_password, json.dumps(workflow.new_audit(first)))
+        resolver.write_generated(self.ctx, first, self.output)
+        path = self.output / 'profile/wifi-password'
+        self.assertEqual(path.read_text(), first.wifi_password)
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        before = path.stat().st_mtime_ns
+        resolver.write_generated(self.ctx, first, self.output)
+        self.assertEqual(path.stat().st_mtime_ns, before)
+
+    def test_missing_wifi_password_fails_before_buildroot_configuration(self):
+        plan = replace(self.plan('polis-rpi4-wifi'), wifi_password='')
+        with patch.object(workflow, 'run') as run:
+            with self.assertRaisesRegex(UserError, 'POLIS_WIFI_SETUP_PASSWORD'):
+                workflow.configure(self.ctx, plan, self.output, False)
+            run.assert_not_called()
+
+    def test_speed_excludes_wifi_services_firmware_and_kernel_drivers(self):
+        speed = self.plan()
+        for symbol in ('BR2_PACKAGE_IWD', 'BR2_PACKAGE_POLIS_WIFI_SETUPD',
+                       'BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI_WIFI',
+                       'BR2_PACKAGE_AVAHI', 'BR2_PACKAGE_DBUS', 'BR2_PACKAGE_OPENRESOLV'):
+            self.assertEqual(speed.values['buildroot'][symbol], 'n')
+        for symbol in ('CONFIG_WLAN', 'CONFIG_CFG80211', 'CONFIG_MAC80211', 'CONFIG_BRCMFMAC'):
+            self.assertEqual(speed.values['kernel'][symbol], 'n')
+        self.assertNotIn('etc/modules-load.d/wifi.conf', speed.values['rootfs'])
+        self.assertNotIn('board/rpi4/install-wifi.py', speed.post_build)
+        with self.assertRaisesRegex(UserError, 'wifi.*disabled'):
+            self.plan(requires=[Capability.WIFI])
+
+    def test_dev_includes_wifi_portal_plus_ethernet_and_ssh(self):
+        dev = self.plan('polis-rpi4-dev')
+        wifi = self.plan('polis-rpi4-wifi')
+        for symbol, value in wifi.values['buildroot'].items():
+            if symbol.startswith('BR2_PACKAGE_') and value == 'y':
+                self.assertEqual(dev.values['buildroot'].get(symbol), 'y', symbol)
+        self.assertEqual(dev.values['buildroot']['BR2_PACKAGE_DROPBEAR'], 'y')
+        self.assertEqual(dev.values['kernel']['CONFIG_BCMGENET'], 'y')
+        self.assertEqual(dev.values['buildroot']['BR2_TARGET_GENERIC_HOSTNAME'], 'polis-dev')
 
     def test_group_order_cannot_change_generated_output_or_fingerprint(self):
         p = self.plan()

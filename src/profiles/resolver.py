@@ -1,5 +1,5 @@
 """Resolve declarative groups into owned configuration and reproducible inputs."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import json
 import os
@@ -146,6 +146,7 @@ class Plan:
     development: bool = False
     ssh_public_key: str = ''
     source_date_epoch: int = 0
+    wifi_password: str = field(default='', repr=False)
 
     def enabled(self, group):
         return group.value in self.groups
@@ -290,12 +291,14 @@ def resolve(ctx: Context, name: str, *, development=False, ssh_public_key=None) 
         assign('firmware', 'bootloader_update', '0', 'erofs-root')
     inputs = input_manifest(ctx, selected_profile_path)
     from .inputs import source_date_epoch
+    from .wifi import password_input
+    wifi_password = password_input(ctx.repo) if 'wifi-setupd' in ordered else ''
     fingerprint = digest(dict(inputs=inputs, profile=profile.name, groups=ordered,
                               buildroot=str(ctx.buildroot), repo=str(ctx.repo), development=development,
-                              ssh_public_key=ssh_key_text))
+                              ssh_public_key=ssh_key_text, wifi_password_sha256=digest(wifi_password)))
     plan = Plan(profile, {g: groups[g] for g in ordered}, values, changes, inputs,
                 fingerprint, overlays, post_build, development, ssh_key_text,
-                source_date_epoch(ctx.buildroot))
+                source_date_epoch(ctx.buildroot), wifi_password)
     compose_buildroot(plan)
     return plan
 
@@ -367,7 +370,15 @@ def write_generated(ctx, plan, output):
     write('defconfig', kconfig_text(buildroot))
     if plan.ssh_public_key:
         write('authorized_keys', plan.ssh_public_key)
+    if plan.enabled(Group.WIFI_SETUPD):
+        path = directory / 'wifi-password'
+        # Do not include the plaintext in configuration/audit JSON or logs.
+        if not path.is_file() or path.read_text() != plan.wifi_password:
+            with path.open('w') as stream:
+                os.fchmod(stream.fileno(), 0o600)
+                stream.write(plan.wifi_password)
     write('image-plan.json', json.dumps(dict(
+        wifi_setup=plan.enabled(Group.WIFI_SETUPD),
         lz4=plan.enabled(Group.LZ4_KERNEL), premerge=premerge,
         cutdown=plan.enabled(Group.CUTDOWN_FIRMWARE),
         ramdisk=plan.enabled(Group.BOOT_RAMDISK), eeprom=selected['eeprom'],

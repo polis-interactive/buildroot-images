@@ -1,0 +1,7 @@
+[[steps]]
+name = "wifi-setupd"
+when = "BR2_PACKAGE_POLIS_WIFI_SETUPD"
+targets = ["polis-wifi-setupd-dirclean", "polis-wifi-setupd"]
+inputs = ["package/polis-wifi-setupd"]
+config = ["BR2_PACKAGE_POLIS_WIFI_SETUPD", "BR2_PACKAGE_HOST_RUSTC*", "BR2_PACKAGE_IWD*", "BR2_INIT_*"]
+outputs = ["{output}/target/usr/bin/wifi-setupd", "{output}/target/usr/share/wifi-setupd", "{output}/target/etc/init.d/S85wifi-setupd", "{output}/target/etc/dbus-1/system.d/wifi-setupd.conf"]

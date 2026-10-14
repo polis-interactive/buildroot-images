@@ -164,6 +164,9 @@ class SharedInputTests(unittest.TestCase):
                     path = images / filename
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(filename.encode())
+                if plan.enabled(resolver.Group.WIFI_SETUPD):
+                    plan.wifi_password = 'fixture-password123'
+                    (output / 'target/var/lib/dbus').mkdir(parents=True)
                 resolver.write_generated(self.ctx, plan, output)
                 env = dict(os.environ, BASE_DIR=str(output), BR2_EXTERNAL_POLIS_PATH=str(REPO),
                            BINARIES_DIR=str(images), HOST_DIR=str(host), BUILD_DIR=str(output / 'build'))

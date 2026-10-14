@@ -5,8 +5,9 @@ Build Raspberry Pi 4 images from declarative profiles:
 | Profile | Contents |
 | --- | --- |
 | [`polis-rpi4-base`](profiles/polis-rpi4-base.toml) | musl toolchain, read-only EROFS root, writable ext4 data, enforced static core linking |
-| [`polis-rpi4-dev`](profiles/polis-rpi4-dev.toml) | Development-only Ethernet DHCP, IPv4 mDNS on Ethernet/Wi-Fi (`polis-dev.local`), key-only SSH, iwd/iwctl, persistent state and application uploads |
-| [`polis-rpi4-speed`](profiles/polis-rpi4-speed.toml) | The base plus product services, diagnostics, capability restrictions, kernel/firmware optimizations, and EEPROM network-installer configuration |
+| [`polis-rpi4-wifi`](profiles/polis-rpi4-wifi.toml) | Temporary base plus iwd, setup portal and IPv4 mDNS (`polis.local`); no Ethernet or development access |
+| [`polis-rpi4-dev`](profiles/polis-rpi4-dev.toml) | Base plus the Wi-Fi stack, Ethernet DHCP, mDNS (`polis-dev.local`), key-only Dropbear SSH and application uploads; headless |
+| [`polis-rpi4-speed`](profiles/polis-rpi4-speed.toml) | Base plus diagnostics, kernel/firmware optimizations and EEPROM configuration; excludes Wi-Fi and Ethernet |
 
 ```sh
 make profiles
@@ -264,10 +265,17 @@ fully static linking.
 
 ## Product services and diagnostics
 
-The speed profile enables iwd, Broadcom Wi-Fi firmware, DHCP and openresolv DNS.
-Runtime Wi-Fi provisioning remains pending integration of our `wifi-connect`
-fork. Images contain no build-time Wi-Fi credentials. The `iwctl` client is
-omitted; provisioning will use D-Bus. Persistent iwd state lives under `/var/lib`.
+The temporary Wi-Fi profile and dev profile enable iwd, Broadcom Wi-Fi firmware,
+Wi-Fi DHCP, openresolv DNS, the setup portal and Avahi. Speed excludes Wi-Fi
+drivers, firmware, iwd, the portal and Avahi. Base remains unchanged until the
+temporary Wi-Fi profile passes hardware acceptance. Wi-Fi images take their
+initial setup password from `POLIS_WIFI_SETUP_PASSWORD`
+or `.local/wifi-setupd/password`; persistent iwd state lives under `/var/lib`. The
+[`polis-wifi-setupd` package](package/polis-wifi-setupd/README.md) adds a portal
+with matching password files preinstalled in the data partition of
+`polis-rpi4-wifi` and dev images.
+It pins release 0.1.3 and its CI-built portal; integrated build and hardware
+acceptance remain to be performed.
 
 UART0 on GPIO14/TX and GPIO15/RX (header pins 8/10) carries 115200-baud kernel
 logs. Use 3.3 V levels and common ground. Bluetooth routing frees UART0.
