@@ -2,6 +2,7 @@
 import importlib.util
 from contextlib import nullcontext
 import json
+import os
 from pathlib import Path
 import shutil
 import struct
@@ -249,6 +250,9 @@ class FirstbootTests(unittest.TestCase):
                          'ext4 test utilities unavailable')
     def test_expansion_resumes_after_partition_growth_and_preserves_files(self):
         disk, data, sys = self.root / 'disk', self.root / 'data.ext4', self.root / 'sys'
+        # Match the tested SD card's 3,584-byte tail with 4 KiB host pages.
+        sectors = 65543
+        capacity = (sectors - 8192) * 512
         raw = bytearray(512)
         raw[510:] = b'\x55\xaa'
         parts = [(12, 2048, 2048), (131, 4096, 4096), (131, 8192, 16384)]
@@ -262,11 +266,11 @@ class FirstbootTests(unittest.TestCase):
         (sys / 'queue/logical_block_size').write_text('512')
         (sys / 'device').mkdir()
         (sys / 'device/cid').write_text('abc123')
-        (sys / 'size').write_text('65536')
+        (sys / 'size').write_text(str(sectors))
         disk.write_bytes(raw)
         with data.open('wb') as stream:
             stream.truncate(8 * 1024**2)
-        subprocess.run(['mkfs.ext4', '-q', '-F', '-L', 'polis-data', str(data)], check=True)
+        subprocess.run(['mkfs.ext4', '-q', '-F', '-b', '1024', '-L', 'polis-data', str(data)], check=True)
         payload = self.root / 'payload'
         payload.write_text('persistent user data')
         subprocess.run(['debugfs', '-w', '-R', f'write {payload} /kept', str(data)],
@@ -278,9 +282,9 @@ class FirstbootTests(unittest.TestCase):
             nonlocal fail
             calls.append(args[0])
             if args[0] == 'partx':
-                (sys / 'mmcblk0p3/size').write_text(str(65536 - 8192))
+                (sys / 'mmcblk0p3/size').write_text(str(sectors - 8192))
                 with data.open('r+b') as stream:
-                    stream.truncate((65536 - 8192) * 512)
+                    stream.truncate(capacity)
                 return ''
             if fail:
                 fail = False
@@ -293,13 +297,20 @@ class FirstbootTests(unittest.TestCase):
                 patch.object(fb, 'SYS_DISK', sys), patch.object(fb, 'command', side_effect=run):
             with self.assertRaisesRegex(OSError, 'interrupted'):
                 target.expand(backup)
+            # A successful command that leaves a genuinely undersized filesystem
+            # must still fail validation; page-tail tolerance cannot hide it.
+            with patch.object(fb, 'command', return_value=''):
+                with self.assertRaisesRegex(RuntimeError, 'Filesystem expansion incomplete'):
+                    target.expand(backup)
             target.expand(backup)
             calls.clear()
             target.activity = False
             result = target.expand(backup)
         self.assertFalse(target.activity)
         self.assertEqual(calls, [])
-        self.assertEqual(result['bytes'], (65536 - 8192) * 512)
+        alignment = max(1024, os.sysconf('SC_PAGE_SIZE'))
+        self.assertEqual(result['bytes'], capacity // alignment * alignment)
+        self.assertGreaterEqual(capacity - result['bytes'], 1024)
         self.assertEqual((backup / 'abc123/mbr-before.bin').read_bytes(), bytes(raw))
         kept = subprocess.check_output(['debugfs', '-R', 'cat /kept', str(data)], stderr=subprocess.DEVNULL)
         self.assertEqual(kept, payload.read_bytes())

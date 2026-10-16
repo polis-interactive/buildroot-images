@@ -7,15 +7,19 @@ the differences; staged configuration displays the differences before building.
 
 The CLI consumes [`polis-rpi4-base`](../profiles/polis-rpi4-base.toml),
 [`polis-rpi4-dev`](../profiles/polis-rpi4-dev.toml),
-[`polis-rpi4-wifi`](../profiles/polis-rpi4-wifi.toml), and
-[`polis-rpi4-speed`](../profiles/polis-rpi4-speed.toml). The Wi-Fi setup profile
-is a temporary non-development image pinned to wifi-setupd 0.1.3 and its release portal; see
-the [package guide](../package/polis-wifi-setupd/README.md).
+[`polis-rpi4-screen-dev`](../profiles/polis-rpi4-screen-dev.toml), and
+[`polis-rpi4-speed`](../profiles/polis-rpi4-speed.toml).
+Base now includes the user-tested Wi-Fi integration pinned to wifi-setupd 0.1.3
+and its release portal; see the [package guide](../package/polis-wifi-setupd/README.md).
 The speed profile selects the optimized kernel, firmware, image layout and
-EEPROM settings and excludes Wi-Fi. Base stays minimal pending successful
-Wi-Fi hardware acceptance. Dev selects the same Wi-Fi stack plus Ethernet and
+EEPROM settings and excludes Wi-Fi. Base provides `polis.local` without SSH or
+Ethernet DHCP.
+Dev selects the same Wi-Fi stack plus Ethernet and
 SSH, retaining its headless settings and separate hostname. These profiles all
 compose groups over `polis-rpi4-v1`; they do not inherit other profile TOML files.
+Screen-dev reuses dev's feature groups and replaces `headless` with `rpi4-video`
+for direct KMS graphics and TC358743 capture. Its shared graphics libraries
+coexist with the static-core policy; see the [bring-up guide](screen-development-image.md).
 Commands and EEPROM preparation are documented in the
 [README](../README.md#declarative-build-profiles).
 
@@ -100,8 +104,9 @@ or `DT_NEEDED` entry fails verification. Dynamic linking remains available to
 other packages; this is not global `BR2_STATIC_LIBS=y`.
 
 `check-static.py` reads Buildroot's selected packages to determine the checked
-executable set. The base does not enable Wi-Fi or the collector to satisfy
-the checker. The static check runs after all profile post-build hooks.
+executable set. The shared `polis-rpi4-v1` core does not enable Wi-Fi or the
+collector to satisfy the checker; the base image selects Wi-Fi explicitly.
+The static check runs after all profile post-build hooks.
 
 `premerge-overlays` selects the host-only `polis-dtmerge` package, built against
 Buildroot's host libfdt. It does not select target diagnostic utilities.

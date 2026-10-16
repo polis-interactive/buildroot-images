@@ -34,6 +34,7 @@ class Group(StrEnum):
     WIFI_SETUPD = "wifi-setupd"
     WIFI_IDENTITY = "wifi-identity"
     DEVELOPMENT_ACCESS = "development-access"
+    RPI4_VIDEO = "rpi4-video"
     UART_DIAGNOSTICS = "uart-diagnostics"
     USB_DIAGNOSTICS = "usb-diagnostics"
     KERNEL_ENTRY_MARKER = "kernel-entry-marker"

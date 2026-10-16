@@ -95,7 +95,7 @@ class EepromTests(unittest.TestCase):
         with patch.object(provision, 'capture_for', side_effect=UserError('missing capture')), \
                 patch.object(workflow, 'configure') as configure, patch.object(workflow, 'build') as build:
             with self.assertRaisesRegex(UserError, 'missing capture'):
-                workflow.execute(self.ctx, 'image', 'polis-rpi4-speed', self.output,
+                workflow.execute(self.ctx, 'image', 'fixture-eeprom', self.output,
                                  capture=self.root / 'missing-capture')
         configure.assert_not_called()
         build.assert_not_called()
@@ -114,7 +114,7 @@ class EepromTests(unittest.TestCase):
                 patch.object(workflow, 'prepare_eeprom', side_effect=stage('prepare')), \
                 patch.object(snapshots, 'snapshot') as snapshot:
             with self.assertRaisesRegex(UserError, 'backend failed'):
-                workflow.execute(self.ctx, 'image', 'polis-rpi4-speed', self.output,
+                workflow.execute(self.ctx, 'image', 'fixture-eeprom', self.output,
                                  capture=self.capture())
         self.assertEqual(events, ['configure', 'build', 'prepare'])
         snapshot.assert_not_called()
@@ -125,7 +125,7 @@ class EepromTests(unittest.TestCase):
         with self.assertRaisesRegex(UserError, 'changed EEPROM capture'):
             provision.capture_for(self.ctx, self.plan(), capture)
 
-    def test_latest_capture_is_selected_and_base_needs_none(self):
+    def test_latest_capture_is_selected_only_when_eeprom_changes_are_requested(self):
         repo = self.root / 'repo'
         captures = repo / '.local/polis-sbc-controller-state/captures'
         captures.mkdir(parents=True)
@@ -136,7 +136,7 @@ class EepromTests(unittest.TestCase):
             path.write_text(json.dumps(data))
         ctx = replace(self.ctx, repo=repo)
         self.assertEqual(provision.capture_for(ctx, self.plan()).name, 'a-new')
-        self.assertIsNone(provision.capture_for(ctx, self.plan('polis-rpi4-base')))
+        self.assertIsNone(provision.capture_for(ctx, self.plan('fixture-empty')))
 
     def test_snapshot_saves_selected_bundle_and_rejects_tampering(self):
         plan = self.built()

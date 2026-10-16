@@ -4,10 +4,10 @@ Build Raspberry Pi 4 images from declarative profiles:
 
 | Profile | Contents |
 | --- | --- |
-| [`polis-rpi4-base`](profiles/polis-rpi4-base.toml) | musl toolchain, read-only EROFS root, writable ext4 data, enforced static core linking |
-| [`polis-rpi4-wifi`](profiles/polis-rpi4-wifi.toml) | Temporary base plus iwd, setup portal and IPv4 mDNS (`polis.local`); no Ethernet or development access |
-| [`polis-rpi4-dev`](profiles/polis-rpi4-dev.toml) | Base plus the Wi-Fi stack, Ethernet DHCP, mDNS (`polis-dev.local`), key-only Dropbear SSH and application uploads; headless |
-| [`polis-rpi4-speed`](profiles/polis-rpi4-speed.toml) | Base plus diagnostics, kernel/firmware optimizations and EEPROM configuration; excludes Wi-Fi and Ethernet |
+| [`polis-rpi4-base`](profiles/polis-rpi4-base.toml) | musl toolchain, read-only EROFS root, writable ext4 data, enforced static core linking, iwd, setup portal and IPv4 mDNS (`polis.local`) |
+| [`polis-rpi4-dev`](profiles/polis-rpi4-dev.toml) | Same core and Wi-Fi stack as base, plus Ethernet DHCP, mDNS (`polis-dev.local`), key-only Dropbear SSH and application uploads; headless |
+| [`polis-rpi4-screen-dev`](profiles/polis-rpi4-screen-dev.toml) | Dev features plus VC4/V3D KMS, TC358743 video/I²S capture, HDMI audio playback, EGL/GLES/GBM, V3DV and diagnostics; [bring-up and Rust guide](docs/screen-development-image.md) |
+| [`polis-rpi4-speed`](profiles/polis-rpi4-speed.toml) | Shared musl/EROFS/static core plus diagnostics, kernel/firmware optimizations and EEPROM configuration; excludes Wi-Fi and Ethernet |
 
 ```sh
 make profiles
@@ -65,8 +65,11 @@ Ethernet/input/32-bit/container support, local storage, and USB peripheral mode.
 Camera/display use requires a different selection: remove the conflicting
 restrictions and enable the drivers and userspace your product needs.
 
-The base does not select boot-log collection, Wi-Fi, or diagnostic services. Retaining
-a capability does not automatically install its drivers or applications.
+The base image includes the tested Wi-Fi setup integration. It does not select
+boot-log collection, diagnostic services, SSH, or Ethernet DHCP. Base and dev
+require a setup password from `POLIS_WIFI_SETUP_PASSWORD` or
+`.local/wifi-setupd/password` before configuring/building. Profiles compose
+groups over the shared `polis-rpi4-v1` core; they do not inherit the base profile.
 
 Generated files and audits live in `.output/<profile>-<input-hash>/profile/`.
 Different inputs get separate build directories. Staged builds reject changed
@@ -265,17 +268,16 @@ fully static linking.
 
 ## Product services and diagnostics
 
-The temporary Wi-Fi profile and dev profile enable iwd, Broadcom Wi-Fi firmware,
+The base and dev profiles enable iwd, Broadcom Wi-Fi firmware,
 Wi-Fi DHCP, openresolv DNS, the setup portal and Avahi. Speed excludes Wi-Fi
-drivers, firmware, iwd, the portal and Avahi. Base remains unchanged until the
-temporary Wi-Fi profile passes hardware acceptance. Wi-Fi images take their
+drivers, firmware, iwd, the portal and Avahi. Wi-Fi images take their
 initial setup password from `POLIS_WIFI_SETUP_PASSWORD`
 or `.local/wifi-setupd/password`; persistent iwd state lives under `/var/lib`. The
 [`polis-wifi-setupd` package](package/polis-wifi-setupd/README.md) adds a portal
 with matching password files preinstalled in the data partition of
-`polis-rpi4-wifi` and dev images.
-It pins release 0.1.3 and its CI-built portal; integrated build and hardware
-acceptance remain to be performed.
+base and dev images.
+It pins release 0.1.3 and its CI-built portal. The promoted base profile still
+needs its own image build and boot verification.
 
 UART0 on GPIO14/TX and GPIO15/RX (header pins 8/10) carries 115200-baud kernel
 logs. Use 3.3 V levels and common ground. Bluetooth routing frees UART0.

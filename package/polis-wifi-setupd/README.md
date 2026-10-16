@@ -1,8 +1,9 @@
 # polis-wifi-setupd
 
 The package pins release **0.1.3**, including the published portal archive and
-its verified SHA-256. It is ready for an image build; compilation and hardware
-acceptance have not been performed in BuildrootImages.
+its verified SHA-256. Following user-confirmed successful integration testing,
+the base and dev profiles both include it. The promoted base profile still
+requires its own image build and boot verification.
 
 The recipe compiles the daemon from tag `0.1.3` with Buildroot 2026.08's Rust 1.97.1 and
 the image's AArch64 musl toolchain. Upstream CI supplies the matching portal.
@@ -48,20 +49,20 @@ Supply the initial setup AP/portal-management password using either:
 
 The environment variable takes precedence. An explicitly empty value is an
 error. Passwords must be 8–63 printable ASCII characters without spaces. No
-password is generated automatically. Both Wi-Fi and dev profiles require this
-input; base and speed ignore it. The `.local` directory is gitignored.
+password is generated automatically. Base and dev
+require this input; speed ignores it. The `.local` directory is gitignored.
 
 For example, create `.local/wifi-setupd/password` with your chosen default, then:
 
 ```sh
-make image ARGS="--profile polis-rpi4-wifi --buildroot /home/broosegoose/Software/buildroot-2026.08"
+make image ARGS="--profile polis-rpi4-base --buildroot /home/broosegoose/Software/buildroot-2026.08"
 ```
 
-Output: `.output/polis-rpi4-wifi-<input-hash>/images/sdcard.img`, plus the printed
+Output: `.output/polis-rpi4-base-<input-hash>/images/sdcard.img`, plus the printed
 snapshot under `.snapshots/`. All devices flashed from this image initially use
-that password and setup SSID **Polis-Setup**. The temporary Wi-Fi profile contains
-base + iwd + portal + Avahi, without Ethernet or SSH. Dev adds Ethernet, SSH and
-its headless settings. Base remains unchanged pending hardware acceptance.
+that password and setup SSID **Polis-Setup**. Base contains iwd, the portal and
+Avahi, without Ethernet DHCP or SSH. Dev adds Ethernet DHCP, SSH and its
+headless settings.
 
 The password is a tracked image input: changing it changes the output identity,
 and a staged build rejects changed inputs until reconfigured. A mode-0600 copy
@@ -135,7 +136,7 @@ rerun just the hook against that existing output directory (from the repository
 root). Substitute the failed build's actual directory below:
 
 ```sh
-out="$PWD/.output/polis-rpi4-wifi-<input-hash>"
+out="$PWD/.output/polis-rpi4-base-<input-hash>"
 BASE_DIR="$out" BR2_EXTERNAL_POLIS_PATH="$PWD" \
 BINARIES_DIR="$out/images" HOST_DIR="$out/host" BUILD_DIR="$out/build" \
 "$out/host/bin/python3" profiles/post-image.py
@@ -150,7 +151,7 @@ since configuration, the normal workflow will still require a fresh configuratio
 ```sh
 python3 -m unittest discover -s tests -p test_wifi_setupd.py
 python3 -m unittest discover -s tests -p 'test_profile*.py'
-make configure ARGS="--profile polis-rpi4-wifi --buildroot /home/broosegoose/Software/buildroot-2026.08"
+make configure ARGS="--profile polis-rpi4-base --buildroot /home/broosegoose/Software/buildroot-2026.08"
 ```
 
 Host tests cover supplied-password precedence, validation, matching credential

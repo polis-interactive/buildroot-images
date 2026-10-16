@@ -93,8 +93,13 @@ def grow_data(device: Path, identity: tuple, image_size: int, source: dict,
     fields = dict(line.split(":", 1) for line in header.splitlines() if ":" in line)
     block_size = int(fields["Block size"].strip())
     filesystem_size = int(fields["Block count"].strip()) * block_size
-    if not 0 <= sectors * 512 - filesystem_size < block_size:
-        raise UserError("Data filesystem did not grow to the partition size.")
+    # Without an explicit size, resize2fs rounds down to the host page size
+    # when it exceeds the filesystem block size (e.g. 4 KiB pages / 1 KiB blocks).
+    alignment = max(block_size, os.sysconf("SC_PAGE_SIZE"))
+    partition_size = sectors * 512
+    if not 0 <= partition_size - filesystem_size < alignment:
+        raise UserError(f"Data filesystem did not grow to the partition size "
+                        f"(filesystem: {filesystem_size:,} bytes; partition: {partition_size:,} bytes).")
     run([*privilege, "blockdev", "--flushbufs", device])
     print(f"/data expanded and flushed: {filesystem_size:,} bytes on {partition}.")
 

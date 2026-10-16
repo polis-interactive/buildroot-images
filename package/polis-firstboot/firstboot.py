@@ -147,6 +147,9 @@ class Target:
                 require(int((sys / f'mmcblk0p{number}/size').read_text()) == parts[number - 1][1],
                         'Kernel boot/root partition size differs from MBR')
         current, block = filesystem_size(DATA)
+        # resize2fs without a size rounds down to a whole system page when
+        # pages exceed ext4 blocks. Accept that tail on this and later boots.
+        alignment = max(block, os.sysconf('SC_PAGE_SIZE'))
         capacity = (sectors - parts[2][0]) * 512
         require(current <= parts[2][1] * 512, 'Filesystem exceeds data partition')
         cid = (sys / 'device/cid').read_text().strip()
@@ -171,12 +174,12 @@ class Target:
             self.activity = True
             command('partx', '--update', '--nr', '3', DISK)
             require(int(kernel_size.read_text()) * 512 == capacity, 'Kernel rejected data partition growth')
-        if capacity - current >= block:
+        if capacity - current >= alignment:
             self.activity = True
             command('resize2fs', DATA)
-            current, block = filesystem_size(DATA)
-            require(0 <= capacity - current < block, 'Filesystem expansion incomplete')
             os.sync()
+            current, block = filesystem_size(DATA)
+            require(0 <= capacity - current < alignment, 'Filesystem expansion incomplete')
         return dict(status='complete', bytes=current, card=cid)
 
     def config(self):

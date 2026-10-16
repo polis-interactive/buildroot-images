@@ -57,6 +57,7 @@
           "wifi-setupd",
           "wifi-identity",
           "development-access",
+          "rpi4-video",
           "uart-diagnostics",
           "usb-diagnostics",
           "kernel-entry-marker",

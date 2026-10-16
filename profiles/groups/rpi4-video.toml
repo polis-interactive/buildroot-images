@@ -1,0 +1,97 @@
+schema = 1
+id = "rpi4-video"
+description = "Pi 4 KMS/GBM/EGL/GLES, TC358743 CSI/I2S capture, HDMI audio and V3DV diagnostics."
+provides = ["display", "camera"]
+# Reuse only the no-getty inittab payload; do not select headless restrictions.
+overlays = ["profiles/groups/headless/rootfs-overlay"]
+remove_firmware = ["gpu_mem_256", "gpu_mem_512", "gpu_mem_1024"]
+firmware_overlays = ["vc4-kms-v3d,cma-256", "tc358743,media-controller", "tc358743-audio"]
+
+[buildroot]
+# Keep the base's shared/static libraries and static core executables. Mesa,
+# Vulkan and applications use shared libraries; no global static linker flags.
+"BR2_PACKAGE_MESA3D" = "y"
+"BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_V3D" = "y"
+"BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_VC4" = "y"
+"BR2_PACKAGE_MESA3D_OPENGL_EGL" = "y"
+"BR2_PACKAGE_MESA3D_OPENGL_ES" = "y"
+"BR2_PACKAGE_MESA3D_GBM" = "y"
+"BR2_PACKAGE_LIBDRM" = "y"
+"BR2_PACKAGE_LIBDRM_VC4" = "y"
+"BR2_PACKAGE_LIBDRM_INSTALL_TESTS" = "y"
+"BR2_PACKAGE_LIBV4L" = "y"
+"BR2_PACKAGE_LIBV4L_UTILS" = "y"
+"BR2_PACKAGE_KMSCUBE" = "y"
+# ALSA PCM capture/playback tools; no mixer UI or state-restoration service.
+"BR2_PACKAGE_ALSA_LIB" = "y"
+"BR2_PACKAGE_ALSA_LIB_PCM" = "y"
+"BR2_PACKAGE_ALSA_UTILS" = "y"
+"BR2_PACKAGE_ALSA_UTILS_APLAY" = "y"
+"BR2_PACKAGE_ALSA_UTILS_ALSACTL" = "n"
+"BR2_PACKAGE_ALSA_UTILS_ALSAMIXER" = "n"
+"BR2_PACKAGE_MESA3D_VULKAN_DRIVER_BROADCOM" = "y"
+"BR2_PACKAGE_VULKAN_LOADER" = "y"
+"BR2_PACKAGE_VULKAN_TOOLS" = "y"
+# Approved transitive packages, explicit so the audit checks their selections.
+"BR2_PACKAGE_ZLIB" = "y"
+"BR2_PACKAGE_LIBZLIB" = "y"
+"BR2_PACKAGE_ARGP_STANDALONE" = "y"
+"BR2_PACKAGE_LIBPTHREAD_STUBS" = "y"
+"BR2_PACKAGE_VULKAN_HEADERS" = "y"
+"BR2_PACKAGE_VULKAN_SDK" = "y"
+"BR2_PACKAGE_RPI_FIRMWARE_INSTALL_DTB_OVERLAYS" = "y"
+"BR2_LINUX_KERNEL_DTB_OVERLAY_SUPPORT" = "y"
+# Enforce a direct-rendering stack, including kmscube's optional integration.
+"BR2_PACKAGE_WESTON" = "n"
+"BR2_PACKAGE_WAYLAND" = "n"
+"BR2_PACKAGE_XORG7" = "n"
+"BR2_PACKAGE_GSTREAMER1" = "n"
+"BR2_PACKAGE_KMSCUBE_GSTREAMER" = "n"
+"BR2_PACKAGE_LIBCAMERA" = "n"
+"BR2_PACKAGE_MESA3D_LLVM" = "n"
+
+[kernel]
+"CONFIG_DRM" = "y"
+"CONFIG_DRM_VC4" = "y"
+"CONFIG_DRM_V3D" = "y"
+# VC4 HDMI playback and TC358743 I2S capture through the simple-card overlay.
+"CONFIG_SOUND" = "y"
+"CONFIG_SND" = "y"
+"CONFIG_SND_SOC" = "y"
+"CONFIG_SND_PCM" = "y"
+"CONFIG_SND_SOC_HDMI_CODEC" = "y"
+"CONFIG_SND_BCM2835_SOC_I2S" = "y"
+"CONFIG_SND_SIMPLE_CARD" = "y"
+# The overlay uses linux,spdif-dir as its capture-only stub codec, over I2S.
+"CONFIG_SND_SOC_SPDIF" = "y"
+"CONFIG_SND_SOC_GENERIC_DMAENGINE_PCM" = "y"
+"CONFIG_DMA_BCM2835" = "y"
+"CONFIG_PM" = "y"
+"CONFIG_RASPBERRYPI_FIRMWARE" = "y"
+"CONFIG_DMA_SHARED_BUFFER" = "y"
+"CONFIG_CMA" = "y"
+"CONFIG_DMA_CMA" = "y"
+"CONFIG_MEDIA_SUPPORT" = "y"
+"CONFIG_MEDIA_CAMERA_SUPPORT" = "y"
+"CONFIG_MEDIA_PLATFORM_SUPPORT" = "y"
+"CONFIG_MEDIA_CONTROLLER" = "y"
+"CONFIG_VIDEO_DEV" = "y"
+"CONFIG_VIDEO_V4L2_SUBDEV_API" = "y"
+"CONFIG_I2C" = "y"
+"CONFIG_I2C_BCM2835" = "y"
+# VC4 waits for the HDMI DDC buses; devtmpfs alone does not autoload modules.
+"CONFIG_I2C_BRCMSTB" = "y"
+"CONFIG_I2C_MUX" = "y"
+"CONFIG_I2C_MUX_PINCTRL" = "y"
+# In the pinned Pi kernel, tc358743,media-controller uses the downstream
+# driver's brcm,bcm2835-unicam compatible, NOT the upstream driver's suffix.
+"CONFIG_VIDEO_BCM2835_UNICAM_LEGACY" = "y"
+"CONFIG_VIDEO_TC358743" = "y"
+"CONFIG_VIDEOBUF2_DMA_CONTIG" = "y"
+
+[firmware]
+"camera_auto_detect" = "0"
+"display_auto_detect" = "0"
+"max_framebuffers" = "2"
+"avoid_warnings" = "2"
+"disable_fw_kms_setup" = "1"

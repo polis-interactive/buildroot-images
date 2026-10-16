@@ -1,0 +1,7 @@
+#:schema ../docs/build-profiles/profile-v1.schema.json
+schema = 1
+name = "polis-rpi4-screen-dev"
+base = "polis-rpi4-v1"
+# Compose the dev profile's feature groups, replacing its headless restriction.
+requires = ["wifi", "wifi-setup-portal", "ethernet", "development-ssh", "display", "camera"]
+groups = ["wifi-iwd", "wifi-setupd", "development-access", "rpi4-video"]

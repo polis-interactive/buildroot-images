@@ -1,18 +1,22 @@
 # Pi 4 development image
 
+For HDMI capture and display development, use [`polis-rpi4-screen-dev`](screen-development-image.md).
+It reuses this profile's development features and replaces its headless restriction.
+
 Build `polis-rpi4-dev` in **BuildrootImages**. It inherits the musl toolchain,
 read-only EROFS root and ext4 `/data` layout. Ethernet uses the built-in BCMGENET
 and Broadcom PHY drivers with DHCP; iwd owns Wi-Fi association and addressing.
 The development profile includes system D-Bus, Pi Wi-Fi firmware, `iwctl`, the
 wifi-setupd portal, key-only Dropbear SSH, and Avahi. It does not select `no-ethernet`.
 
-The separate `polis-rpi4-wifi` profile exercises the same
+The `polis-rpi4-base` profile includes the same
 [`polis-wifi-setupd` package](../package/polis-wifi-setupd/README.md) without
-Ethernet or development access. It uses `polis.local`; dev retains
+Ethernet DHCP or development access. It uses `polis.local`; dev retains
 `polis-dev.local`. Both require `POLIS_WIFI_SETUP_PASSWORD` or
 `.local/wifi-setupd/password` when configuring/building; the image contains the
-matching AP and portal password files. Base stays minimal until the temporary Wi-Fi profile passes
-hardware acceptance. Integrated build and hardware acceptance remain unverified.
+matching AP and portal password files. The integration was promoted after
+user-confirmed successful testing. Build and boot
+verification of the promoted base profile remains separate.
 
 ## Build and identify
 
