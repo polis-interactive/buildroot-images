@@ -10,19 +10,36 @@ use rmcp::{
 use serde::Deserialize;
 use std::path::PathBuf;
 
+mod repl;
+
 #[derive(Parser)]
-#[command(about = "CLI and MCP frontend for one explicitly selected Polis fixture")]
+#[command(
+    about = "CLI and MCP frontend for one explicitly selected Polis fixture",
+    after_help = "Omit COMMAND to open the interactive REPL. Type help in the session to list commands."
+)]
 struct Args {
     #[arg(long)]
     socket: PathBuf,
     #[arg(long)]
     fixture: String,
     #[command(subcommand)]
-    command: Cli,
+    command: Option<Cli>,
 }
 #[derive(Subcommand)]
 enum Cli {
+    #[command(flatten)]
+    Action(ActionCommand),
+    /// Open an interactive session; type help to discover commands.
+    Repl,
+    /// Serve MCP over stdio for automation clients.
+    Mcp,
+}
+
+#[derive(Subcommand)]
+enum ActionCommand {
+    /// Show fixture connection, workflow progress, and failures.
     Status,
+    /// List available repository images and snapshots.
     Images,
     /// Retrieve current boot firmware/kernel logs over the dedicated Pi USB port.
     Diagnostics,
@@ -30,34 +47,40 @@ enum Cli {
     Benchmark {
         #[arg(long, default_value_t = 5)]
         samples: u32,
-        #[arg(long)]
-        confirm_fixture: String,
+        /// Optional compatibility override; defaults to the selected fixture.
+        #[arg(long, hide = true)]
+        confirm_fixture: Option<String>,
     },
     /// Commission recovery: power cycle and load the pinned RAM gadget; never flash.
     RecoveryUsb {
-        #[arg(long)]
-        confirm_fixture: String,
+        /// Optional compatibility override; defaults to the selected fixture.
+        #[arg(long, hide = true)]
+        confirm_fixture: Option<String>,
     },
+    /// Read captured UART output from a byte offset.
     ConsoleRead {
         #[arg(long, default_value_t = 0)]
         after: u64,
         #[arg(long, default_value_t = 4096)]
         max_bytes: usize,
     },
-    ConsoleWrite {
-        text: String,
-    },
+    /// Write raw UTF-8 text to the Pi UART (maximum 128 bytes).
+    ConsoleWrite { text: String },
+    /// Switch Pi power on or off.
     Power {
         #[arg(value_parser = ["on", "off"])]
         state: String,
-        #[arg(long)]
-        confirm_fixture: String,
+        /// Optional compatibility override; defaults to the selected fixture.
+        #[arg(long, hide = true)]
+        confirm_fixture: Option<String>,
     },
+    /// Cycle Pi power.
     Cycle {
         #[arg(long, default_value_t = 1000)]
         off_ms: u32,
-        #[arg(long)]
-        confirm_fixture: String,
+        /// Optional compatibility override; defaults to the selected fixture.
+        #[arg(long, hide = true)]
+        confirm_fixture: Option<String>,
     },
     /// Flash a selected image then boot, or boot-only if no image is supplied.
     Run {
@@ -67,10 +90,10 @@ enum Cli {
         sha256: Option<String>,
         #[arg(long)]
         auto_recover: bool,
-        #[arg(long)]
-        confirm_fixture: String,
+        /// Optional compatibility override; defaults to the selected fixture.
+        #[arg(long, hide = true)]
+        confirm_fixture: Option<String>,
     },
-    Mcp,
 }
 #[derive(Clone)]
 struct Frontend {
@@ -238,59 +261,77 @@ async fn main() -> Result<()> {
         socket: args.socket,
         fixture: args.fixture,
     };
-    let action = match args.command {
+    match args.command.unwrap_or(Cli::Repl) {
         Cli::Mcp => {
             frontend
                 .serve(rmcp::transport::stdio())
                 .await?
                 .waiting()
                 .await?;
-            return Ok(());
+            Ok(())
         }
-        Cli::Status => Action::Status,
-        Cli::Images => Action::Images,
-        Cli::Diagnostics => Action::Diagnostics,
-        Cli::Benchmark {
-            samples,
-            confirm_fixture,
-        } => Action::Benchmark {
-            samples,
-            confirm_fixture,
-        },
-        Cli::RecoveryUsb { confirm_fixture } => Action::RecoveryUsb { confirm_fixture },
-        Cli::ConsoleRead { after, max_bytes } => Action::ConsoleRead { after, max_bytes },
-        Cli::ConsoleWrite { text } => Action::ConsoleWrite { text },
-        Cli::Power {
-            state,
-            confirm_fixture,
-        } => Action::Power {
-            on: state == "on",
-            confirm_fixture,
-        },
-        Cli::Cycle {
-            off_ms,
-            confirm_fixture,
-        } => Action::Cycle {
-            off_ms,
-            confirm_fixture,
-        },
-        Cli::Run {
-            image,
-            sha256,
-            auto_recover,
-            confirm_fixture,
-        } => Action::Workflow {
-            image: image.map(|path| Image {
-                path,
-                sha256: sha256.unwrap(),
-            }),
-            auto_recover,
-            confirm_fixture,
-        },
-    };
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&frontend.request(action).await?)?
-    );
-    Ok(())
+        Cli::Repl => repl::run(&frontend).await,
+        Cli::Action(command) => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(
+                    &frontend
+                        .request(command.into_action(&frontend.fixture))
+                        .await?
+                )?
+            );
+            Ok(())
+        }
+    }
+}
+
+impl ActionCommand {
+    fn into_action(self, fixture: &str) -> Action {
+        match self {
+            ActionCommand::Status => Action::Status,
+            ActionCommand::Images => Action::Images,
+            ActionCommand::Diagnostics => Action::Diagnostics,
+            ActionCommand::Benchmark {
+                samples,
+                confirm_fixture,
+            } => Action::Benchmark {
+                samples,
+                confirm_fixture: confirm_fixture.unwrap_or_else(|| fixture.to_owned()),
+            },
+            ActionCommand::RecoveryUsb { confirm_fixture } => Action::RecoveryUsb {
+                confirm_fixture: confirm_fixture.unwrap_or_else(|| fixture.to_owned()),
+            },
+            ActionCommand::ConsoleRead { after, max_bytes } => {
+                Action::ConsoleRead { after, max_bytes }
+            }
+            ActionCommand::ConsoleWrite { text } => Action::ConsoleWrite { text },
+            ActionCommand::Power {
+                state,
+                confirm_fixture,
+            } => Action::Power {
+                on: state == "on",
+                confirm_fixture: confirm_fixture.unwrap_or_else(|| fixture.to_owned()),
+            },
+            ActionCommand::Cycle {
+                off_ms,
+                confirm_fixture,
+            } => Action::Cycle {
+                off_ms,
+                confirm_fixture: confirm_fixture.unwrap_or_else(|| fixture.to_owned()),
+            },
+            ActionCommand::Run {
+                image,
+                sha256,
+                auto_recover,
+                confirm_fixture,
+            } => Action::Workflow {
+                image: image.map(|path| Image {
+                    path,
+                    sha256: sha256.unwrap(),
+                }),
+                auto_recover,
+                confirm_fixture: confirm_fixture.unwrap_or_else(|| fixture.to_owned()),
+            },
+        }
+    }
 }

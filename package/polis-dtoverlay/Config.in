@@ -1,0 +1,9 @@
+config BR2_PACKAGE_POLIS_DTOVERLAY
+	bool "polis-dtoverlay"
+	depends on !BR2_STATIC_LIBS
+	select BR2_PACKAGE_DTC
+	help
+	  Raspberry Pi's dtoverlay utility for runtime device-tree
+	  overlays. Installs only dtoverlay; libfdt is supplied by the
+	  dtc library package. Requires kernel OF/configfs overlay
+	  support and accessible .dtbo files.

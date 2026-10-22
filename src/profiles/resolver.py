@@ -355,10 +355,10 @@ def write_generated(ctx, plan, output):
     selected = plan.values
     firmware = dict(selected['firmware'])
     premerge = plan.enabled(Group.PREMERGE_OVERLAYS)
+    firmware_overlays = [key[8:] for key in firmware if key.startswith('overlay:')]
     lines = [f'{key}={value}' for key, value in firmware.items() if not key.startswith('overlay:')]
-    for key in firmware:
-        if key.startswith('overlay:') and not (premerge and key[8:] in ('disable-bt', 'dwc2,dr_mode=peripheral')):
-            lines.append('dtoverlay=' + key[8:])
+    if not premerge:
+        lines.extend('dtoverlay=' + overlay for overlay in firmware_overlays)
     write('config.txt', '\n'.join(lines) + '\n')
     tokens = []
     for key, value in selected['cmdline'].items():
@@ -380,6 +380,7 @@ def write_generated(ctx, plan, output):
     write('image-plan.json', json.dumps(dict(
         wifi_setup=plan.enabled(Group.WIFI_SETUPD),
         lz4=plan.enabled(Group.LZ4_KERNEL), premerge=premerge,
+        firmware_overlays=firmware_overlays,
         cutdown=plan.enabled(Group.CUTDOWN_FIRMWARE),
         ramdisk=plan.enabled(Group.BOOT_RAMDISK), eeprom=selected['eeprom'],
         development=plan.development,

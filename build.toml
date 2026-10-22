@@ -15,6 +15,7 @@ config = ["BR2_ARCH*", "BR2_aarch64", "BR2_ARM*", "BR2_cortex*", "BR2_TOOLCHAIN*
 
 [[steps]]
 name = "kernel-source"
+inherit_defaults = false
 when = "BR2_LINUX_KERNEL"
 targets = ["linux-dirclean"]
 inputs = ["{buildroot}/linux", "{buildroot}/board/raspberrypi/patches/linux", "patches/*/linux"]
@@ -28,13 +29,14 @@ name = "kernel"
 when = "BR2_LINUX_KERNEL"
 depends_on = ["kernel-source"]
 targets = ["linux-reconfigure"]
-inputs = ["{buildroot}/linux", "board/rpi4/kernel-entry.patch", "board/rpi4/install-kernel-entry.py", "board/rpi4/kernel-entry.mk"]
-config = ["BR2_LINUX_KERNEL*"]
+inputs = ["{buildroot}/linux", "board/rpi4/kernel-entry.patch", "board/rpi4/install-kernel-entry.py", "board/rpi4/kernel-entry.mk", "board/rpi4/kernel-logo.mk", "profiles/groups/rpi4-video/splash/polis-splash.ppm"]
+config = ["BR2_LINUX_KERNEL*", "BR2_POLIS_KERNEL_LOGO"]
 config_paths = ["BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE", "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES", "BR2_LINUX_KERNEL_CUSTOM_DTS_PATH", "BR2_LINUX_KERNEL_CUSTOM_DTS_DIR", "BR2_LINUX_KERNEL_CUSTOM_LOGO_PATH"]
 outputs = ["{output}/build/linux-*/.stamp_built", "{output}/build/linux-*/.config", "{output}/images/Image"]
 
 [[steps]]
 name = "busybox-source"
+inherit_defaults = false
 when = "BR2_PACKAGE_BUSYBOX"
 targets = ["busybox-dirclean"]
 inputs = ["{buildroot}/package/busybox", "patches/*/busybox"]
@@ -53,6 +55,7 @@ outputs = ["{output}/build/busybox-*/.stamp_built", "{output}/build/busybox-*/.c
 
 [[steps]]
 name = "firmware-source"
+inherit_defaults = false
 when = "BR2_PACKAGE_RPI_FIRMWARE"
 targets = ["rpi-firmware-dirclean"]
 inputs = ["{buildroot}/package/rpi-firmware", "patches/*/rpi-firmware"]

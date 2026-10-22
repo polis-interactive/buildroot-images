@@ -42,6 +42,19 @@ class ExpansionTest(unittest.TestCase):
         self.ctx = Context(self.root, self.root, self.root, self.root)
         self.enterContext(contextlib.redirect_stdout(StringIO()))
 
+    def test_discovery_uses_the_shared_completed_output(self):
+        output = self.root / '.output'
+        (output / 'profile').mkdir(parents=True)
+        (output / 'images').mkdir()
+        image = output / 'images/sdcard.img'
+        image.write_bytes(b'image')
+        audit = output / 'profile/audit.json'
+        with patch.object(images.snapshots, 'completed', return_value=[]):
+            audit.write_text(json.dumps({'profile': 'screen', 'state': 'built'}))
+            self.assertEqual(images.discover_images(self.ctx), [image])
+            audit.write_text(json.dumps({'profile': 'screen', 'state': 'configured'}))
+            self.assertEqual(images.discover_images(self.ctx), [])
+
     def test_flag_defaults_off_and_is_forwarded(self):
         self.assertFalse(cli.parser().parse_args(['flash']).expand_data)
         with patch.object(images, 'flash') as flash:
@@ -152,6 +165,74 @@ class ExpansionTest(unittest.TestCase):
         with patch.object(images, 'grow_data', side_effect=fail):
             with self.assertRaisesRegex(UserError, 'Image was written, but /data expansion failed'):
                 images.flash(self.ctx, self.image, self.device, expand_data=True)
+
+    def test_hostname_is_written_after_image_and_before_expansion(self):
+        command = self.flash_mocks()
+        prepared = self.root / 'prepared.ext4'
+        def after_hostname(*args):
+            self.assertIn(f'if={prepared}', command.call_args.args[0])
+            self.assertIn('conv=notrunc,fsync', command.call_args.args[0])
+        with patch.object(images.hostname_config, 'prepare', return_value=prepared), \
+                patch.object(images, 'grow_data', side_effect=after_hostname) as grow:
+            images.flash(self.ctx, self.image, self.device, hostname='polis-2', expand_data=True)
+        writes = [call.args[0] for call in command.call_args_list if call.args[0][0] == 'dd']
+        self.assertEqual(len(writes), 2)
+        self.assertIn(f'if={self.image}', writes[0])
+        self.assertIn(f'if={prepared}', writes[1])
+        self.assertIn('seek=6144', writes[1])
+        self.assertIn('conv=notrunc,fsync', writes[1])
+        grow.assert_called_once()
+
+    def test_hostname_compatibility_failure_never_writes(self):
+        command = self.flash_mocks()
+        with patch.object(images.hostname_config, 'prepare', side_effect=UserError('old image')):
+            with self.assertRaisesRegex(UserError, 'old image'):
+                images.flash(self.ctx, self.image, self.device, hostname='polis-2')
+        command.assert_not_called()
+
+    def test_cancel_with_hostname_never_writes(self):
+        command = self.flash_mocks()
+        with patch.object(images.hostname_config, 'prepare', return_value=self.root / 'data.ext4'), \
+                patch('builtins.input', return_value='no'):
+            with self.assertRaisesRegex(UserError, 'Cancelled'):
+                images.flash(self.ctx, self.image, self.device, hostname='polis-2')
+        command.assert_not_called()
+
+    def test_hostname_write_failure_reports_partial_flash(self):
+        command = self.flash_mocks()
+        def write(args, **kwargs):
+            if 'conv=notrunc,fsync' in args:
+                raise OSError('write failed')
+            return subprocess.CompletedProcess(args, 0, '512\n', '')
+        command.side_effect = write
+        with patch.object(images.hostname_config, 'prepare', return_value=self.root / 'data.ext4'):
+            with self.assertRaisesRegex(UserError, 'Image was written, but per-card configuration failed'):
+                images.flash(self.ctx, self.image, self.device, hostname='polis-2')
+
+    def test_ap_only_prepares_and_writes_data(self):
+        command = self.flash_mocks()
+        prepared = self.root / 'prepared.ext4'
+        with patch.object(images.hostname_config, 'prepare', return_value=prepared) as prepare:
+            images.flash(self.ctx, self.image, self.device, ap_name='Polis-Setup-2')
+        self.assertIsNone(prepare.call_args.args[3])
+        self.assertEqual(prepare.call_args.kwargs, dict(ap_name='Polis-Setup-2'))
+        self.assertIn(f'if={prepared}', command.call_args.args[0])
+        self.assertIn('conv=notrunc,fsync', command.call_args.args[0])
+
+    def test_cancel_with_ap_name_never_writes(self):
+        command = self.flash_mocks()
+        with patch.object(images.hostname_config, 'prepare', return_value=self.root / 'data.ext4'), \
+                patch('builtins.input', return_value='no'):
+            with self.assertRaisesRegex(UserError, 'Cancelled'):
+                images.flash(self.ctx, self.image, self.device, ap_name='Polis-Setup-2')
+        command.assert_not_called()
+
+    def test_ap_preflight_failure_never_writes(self):
+        command = self.flash_mocks()
+        with patch.object(images.hostname_config, 'prepare', side_effect=UserError('missing Wi-Fi')):
+            with self.assertRaisesRegex(UserError, 'missing Wi-Fi'):
+                images.flash(self.ctx, self.image, self.device, ap_name='Polis-Setup-2')
+        command.assert_not_called()
 
     def grow_mocks(self, fsck_status=0, kernel_size=None, fs_size=None, changed_layout=False,
                    block_size=4096):

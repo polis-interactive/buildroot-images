@@ -27,14 +27,17 @@ class SbcControllerFrontendTest(unittest.TestCase):
         self.listener.close()
         self.temp.cleanup()
 
-    def fake_daemon(self):
+    def fake_daemon(self, count=1, responses=None):
         try:
-            connection, _ = self.listener.accept()
-            with connection:
-                connection.settimeout(5)
-                with connection.makefile('rb') as stream:
-                    self.requests.append(json.loads(stream.readline()))
-                connection.sendall(json.dumps({'ok': True, 'data': {'fixture': 'bench', 'simulated': True}, 'error': None}).encode()+b'\n')
+            for index in range(count):
+                connection, _ = self.listener.accept()
+                with connection:
+                    connection.settimeout(5)
+                    with connection.makefile('rb') as stream:
+                        self.requests.append(json.loads(stream.readline()))
+                    response = responses[index] if responses else {'ok': True, 'data': {'fixture': 'bench', 'simulated': True}, 'error': None}
+                    if response is not None:
+                        connection.sendall(json.dumps(response).encode()+b'\n')
         except Exception as error:
             self.failures.append(error)
 
@@ -44,7 +47,7 @@ class SbcControllerFrontendTest(unittest.TestCase):
     def test_cli_transmits_explicit_fixture_and_workflow_authorization(self):
         thread = threading.Thread(target=self.fake_daemon); thread.start()
         result = subprocess.run(self.args('run', '--image', '/explicit/candidate.img', '--sha256', 'a'*64,
-                                        '--auto-recover', '--confirm-fixture', 'bench'),
+                                        '--auto-recover'),
                                 check=True, capture_output=True, text=True, timeout=10)
         thread.join(5)
         self.assertFalse(self.failures)
@@ -58,7 +61,7 @@ class SbcControllerFrontendTest(unittest.TestCase):
 
     def test_recovery_usb_is_explicit_and_has_no_flash_parameters(self):
         thread = threading.Thread(target=self.fake_daemon); thread.start()
-        subprocess.run(self.args('recovery-usb', '--confirm-fixture', 'bench'),
+        subprocess.run(self.args('recovery-usb'),
                        check=True, capture_output=True, text=True, timeout=10)
         thread.join(5)
         self.assertFalse(self.failures)
@@ -67,7 +70,7 @@ class SbcControllerFrontendTest(unittest.TestCase):
 
     def test_benchmark_transmits_count_and_confirmation(self):
         thread = threading.Thread(target=self.fake_daemon); thread.start()
-        subprocess.run(self.args('benchmark', '--samples', '3', '--confirm-fixture', 'bench'),
+        subprocess.run(self.args('benchmark', '--samples', '3'),
                        check=True, capture_output=True, text=True, timeout=10)
         thread.join(5)
         self.assertFalse(self.failures)
@@ -81,11 +84,80 @@ class SbcControllerFrontendTest(unittest.TestCase):
         self.assertFalse(self.failures)
         self.assertEqual(self.requests[0]['operation'], {'action': 'diagnostics'})
 
-    def test_cli_requires_confirmation_and_paired_image_hash(self):
-        for args in [('benchmark',), ('run',), ('recovery-usb',), ('run', '--image', '/image.img', '--confirm-fixture', 'bench')]:
+    def test_cli_requires_paired_image_hash(self):
+        for args in [('run', '--image', '/image.img'), ('run', '--sha256', 'a'*64)]:
             result = subprocess.run(self.args(*args), capture_output=True, text=True, timeout=5)
             self.assertNotEqual(result.returncode, 0)
         self.assertFalse(self.requests)
+
+    def test_repl_help_and_exit_need_no_daemon(self):
+        for command in [(), ('repl',)]:
+            result = subprocess.run(self.args(*command), input='help\nhelp run\nconsole-read --help\nquit\nstatus\n',
+                                    capture_output=True, text=True, timeout=5, check=True)
+            self.assertIn('Fixture: bench', result.stdout)
+            self.assertIn('--sha256', result.stdout)
+            self.assertIn('--max-bytes', result.stdout)
+            self.assertIn('exit', result.stdout)
+            self.assertEqual(result.stderr, '')
+        self.assertFalse(self.requests)
+
+    def test_cli_and_repl_use_selected_fixture_without_confirmation(self):
+        commands = [('power', 'on'), ('power', 'off'), ('cycle',), ('run',),
+                    ('benchmark',), ('recovery-usb',)]
+        thread = threading.Thread(target=self.fake_daemon, args=(len(commands) * 2,)); thread.start()
+        for command in commands:
+            subprocess.run(self.args(*command), capture_output=True, text=True, timeout=5, check=True)
+        subprocess.run(self.args('repl'), input='\n'.join(' '.join(command) for command in commands) + '\nexit\n',
+                       capture_output=True, text=True, timeout=10, check=True)
+        thread.join(5)
+        self.assertFalse(self.failures)
+        self.assertEqual(len(self.requests), len(commands) * 2)
+        for request in self.requests:
+            self.assertEqual(request['fixture'], 'bench')
+            self.assertEqual(request['operation']['confirm_fixture'], 'bench')
+        for command in commands:
+            result = subprocess.run(self.args(command[0], '--help'),
+                                    capture_output=True, text=True, timeout=5, check=True)
+            self.assertNotIn('--confirm-fixture', result.stdout)
+
+    def test_repl_preserves_session_and_quoted_arguments(self):
+        thread = threading.Thread(target=self.fake_daemon, args=(3,)); thread.start()
+        result = subprocess.run(self.args('repl'),
+                                input="status\nconsole-write 'héllo world'\nrun --image '/tmp/my image.img' --sha256 " + 'a'*64 + "\nexit\n",
+                                capture_output=True, text=True, timeout=10, check=True)
+        thread.join(5)
+        self.assertFalse(self.failures)
+        self.assertEqual(len(self.requests), 3)
+        self.assertTrue(all(request['fixture'] == 'bench' for request in self.requests))
+        self.assertEqual(self.requests[1]['operation'], {'action': 'console_write', 'text': 'héllo world'})
+        self.assertEqual(self.requests[2]['operation']['image']['path'], '/tmp/my image.img')
+        self.assertEqual(result.stdout.count('"simulated": true'), 3)
+
+    def test_repl_rejects_invalid_input_and_keeps_running(self):
+        thread = threading.Thread(target=self.fake_daemon); thread.start()
+        result = subprocess.run(self.args('repl'),
+                                input="nonsense\npower invalid\nrun --image /tmp/image\nconsole-write 'unclosed\nrepl\nmcp\nstatus\n",
+                                capture_output=True, text=True, timeout=10, check=True)
+        thread.join(5)
+        self.assertFalse(self.failures)
+        self.assertEqual([request['operation'] for request in self.requests], [{'action': 'status'}])
+        self.assertIn('--sha256', result.stderr)
+        self.assertIn('unclosed quote', result.stderr)
+        self.assertIn('"simulated": true', result.stdout)
+
+    def test_repl_does_not_retry_failed_or_ambiguous_requests(self):
+        responses = [None, {'ok': False, 'data': None, 'error': 'fixture busy'},
+                     {'ok': True, 'data': {'recovered': True}, 'error': None}]
+        thread = threading.Thread(target=self.fake_daemon, args=(3, responses)); thread.start()
+        result = subprocess.run(self.args('repl'),
+                                input='cycle\nimages\nstatus\nexit\n',
+                                capture_output=True, text=True, timeout=10, check=True)
+        thread.join(5)
+        self.assertFalse(self.failures)
+        self.assertEqual([request['operation']['action'] for request in self.requests], ['cycle', 'images', 'status'])
+        self.assertIn('invalid/truncated daemon response', result.stderr)
+        self.assertIn('fixture busy', result.stderr)
+        self.assertIn('"recovered": true', result.stdout)
 
     def test_mcp_lists_tools_and_calls_status_through_shared_daemon_api(self):
         thread = threading.Thread(target=self.fake_daemon); thread.start()

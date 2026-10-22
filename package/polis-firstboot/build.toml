@@ -3,5 +3,5 @@ name = "firstboot"
 when = "BR2_PACKAGE_POLIS_FIRSTBOOT"
 targets = ["polis-firstboot-dirclean", "polis-firstboot"]
 inputs = ["package/polis-firstboot"]
-config = ["BR2_PACKAGE_POLIS_FIRSTBOOT", "BR2_PACKAGE_PYTHON3*", "BR2_PACKAGE_E2FSPROGS*", "BR2_PACKAGE_UTIL_LINUX*"]
+config = ["BR2_PACKAGE_POLIS_FIRSTBOOT", "BR2_PACKAGE_PYTHON3*"]
 outputs = ["{output}/target/usr/share/polis-firstboot/rpi-eeprom-config", "{output}/target/usr/share/polis-firstboot/pieeprom.bin"]

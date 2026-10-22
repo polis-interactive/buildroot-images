@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 from src.common import Context, UserError
 from src.profiles import inputs, resolver, workflow, provision
-from src.profiles.image import recipe
+from src.profiles.image import assemble, recipe
 from src.profiles.options import BASE_GROUPS, Capability, Group
 from profile_fixtures import PREMERGE_GROUPS, WIFI_GROUPS, prepare_repo, write_profile
 
@@ -105,11 +105,11 @@ class ProfileBuildTests(unittest.TestCase):
         self.assertEqual(p.values, reverse.values)
         self.assertEqual(p.overlays, reverse.overlays)
 
-    def test_development_mode_is_isolated_and_disables_provisioning(self):
+    def test_development_mode_reuses_output_and_disables_provisioning(self):
         final = self.plan()
         dev = resolver.resolve(self.ctx, 'fixture-eeprom', development=True)
         self.assertNotEqual(final.fingerprint, dev.fingerprint)
-        self.assertNotEqual(workflow.output_for(self.ctx, final), workflow.output_for(self.ctx, dev))
+        self.assertEqual(workflow.output_for(self.ctx, final), workflow.output_for(self.ctx, dev))
         self.assertEqual(final.values['buildroot']['BR2_PACKAGE_POLIS_FIRSTBOOT'], 'y')
         self.assertNotIn('BR2_PACKAGE_POLIS_FIRSTBOOT', dev.values['buildroot'])
         resolver.write_generated(self.ctx, dev, self.output)
@@ -117,8 +117,26 @@ class ProfileBuildTests(unittest.TestCase):
         self.assertTrue(image['development'])
         self.assertIn('bootloader_update=0', (self.output / 'profile/config.txt').read_text())
         self.configure()
-        with self.assertRaisesRegex(UserError, 'another input set'):
+        with patch.object(workflow, 'run', side_effect=self.fake_configure):
             workflow.configure(self.ctx, dev, self.output, False)
+        workflow.assert_current(self.ctx, dev, self.output)
+        self.assertTrue((self.output / 'profile/reinstall-target').exists())
+
+    def test_image_metadata_never_requests_boot_time_storage_expansion(self):
+        images = self.output / 'images'
+        images.mkdir(parents=True)
+        for development in (False, True):
+            with self.subTest(development=development):
+                plan = resolver.resolve(self.ctx, 'fixture-empty', development=development)
+                resolver.write_generated(self.ctx, plan, self.output)
+                # Exercise metadata generation without building an image.
+                with patch('src.profiles.image.subprocess.run'):
+                    assemble(dict(BASE_DIR=str(self.output), BR2_EXTERNAL_POLIS_PATH=str(REPO),
+                                  BINARIES_DIR=str(images), HOST_DIR=str(self.output / 'host'),
+                                  BUILD_DIR=str(self.output / 'build')))
+                metadata = json.loads((images / 'provisioning.json').read_text())
+                self.assertIs(metadata['expand_data'], False)
+                self.assertEqual(metadata['enabled'], not development)
 
     def test_missing_prerequisite_rejected(self):
         with self.assertRaisesRegex(UserError, 'requires explicitly selected group headless'):
@@ -315,3 +333,30 @@ class ProfileBuildTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+    def test_all_profiles_modes_and_input_versions_share_default_output(self):
+        first = self.plan()
+        for plan in (first, self.plan('fixture-empty'),
+                     replace(first, development=True), replace(first, fingerprint='b' * 64)):
+            self.assertEqual(workflow.output_for(self.ctx, plan), self.ctx.repo / '.output')
+        self.assertEqual(workflow.output_for(self.ctx, first, self.root / 'override'),
+                         self.root / 'override')
+
+    def test_changed_inputs_keep_compiled_objects_and_repopulate_target(self):
+        plan, _ = self.configure()
+        objects = self.output / 'build/fixture-1'
+        objects.mkdir(parents=True)
+        (objects / 'kept.o').write_bytes(b'compiled')
+        (objects / '.stamp_built').touch()
+        (objects / '.stamp_target_installed').touch()
+        (self.output / 'target/usr/bin').mkdir(parents=True)
+        (self.output / 'target/usr/bin/removed-service').write_text('obsolete')
+        changed = replace(plan, fingerprint='b' * 64)
+        with patch.object(workflow, 'run', side_effect=self.fake_configure):
+            workflow.configure(self.ctx, changed, self.output, False)
+        workflow.assert_current(self.ctx, changed, self.output)
+        workflow.reinstall_target(self.output)
+        self.assertFalse((self.output / 'target').exists())
+        self.assertFalse((objects / '.stamp_target_installed').exists())
+        self.assertEqual((objects / 'kept.o').read_bytes(), b'compiled')
+        self.assertTrue((objects / '.stamp_built').exists())

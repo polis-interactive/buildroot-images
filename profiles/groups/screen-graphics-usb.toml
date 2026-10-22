@@ -1,0 +1,17 @@
+schema = 1
+id = "screen-graphics-usb"
+description = "mdev activation and supervised per-Pico graphics lookup workers."
+requires = ["rpi4-usb-host", "development-access"]
+inputs = ["package/polis-graphics-usb", ".local/graphics-usb"]
+post_build = ["package/polis-graphics-usb/install-mdev.py"]
+
+[buildroot]
+"BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_MDEV" = "y"
+"BR2_PACKAGE_POLIS_GRAPHICS_USB" = "y"
+
+[busybox]
+"CONFIG_MDEV" = "y"
+"CONFIG_FEATURE_MDEV_CONF" = "y"
+"CONFIG_FEATURE_MDEV_EXEC" = "y"
+"CONFIG_FEATURE_MDEV_DAEMON" = "y"
+

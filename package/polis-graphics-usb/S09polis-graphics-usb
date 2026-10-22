@@ -1,0 +1,33 @@
+#!/bin/sh
+# Start before S10mdev so its initial scan can deliver events.
+DAEMON=/usr/sbin/polis-graphics-usb
+PIDFILE=/run/polis-graphics-usb.pid
+
+start() {
+    start-stop-daemon -S -q -b -m -p "$PIDFILE" -x "$DAEMON" || return $?
+    # Bound readiness wait; mdev must never start against an unbound socket.
+    n=0
+    while [ ! -S /run/polis-graphics-usb/events ]; do
+        n=$((n + 1))
+        [ "$n" -lt 50 ] || { echo 'graphics USB receiver failed to start' >&2; return 1; }
+        sleep 0.1
+    done
+}
+
+stop() {
+    start-stop-daemon -K -q -o -p "$PIDFILE" -x "$DAEMON" || return $?
+    n=0
+    while start-stop-daemon -K -t -q -p "$PIDFILE" -x "$DAEMON"; do
+        n=$((n + 1))
+        [ "$n" -lt 50 ] || { echo 'graphics USB receiver failed to stop' >&2; return 1; }
+        sleep 0.1
+    done
+    rm -f "$PIDFILE"
+}
+
+case "$1" in
+    start) start ;;
+    stop) stop ;;
+    restart) stop && start ;;
+    *) echo "Usage: $0 {start|stop|restart}" >&2; exit 1 ;;
+esac

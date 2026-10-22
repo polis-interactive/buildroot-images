@@ -2,6 +2,15 @@ source "$BR2_EXTERNAL_POLIS_PATH/package/polis-boot-diagnostics/Config.in"
 source "$BR2_EXTERNAL_POLIS_PATH/package/polis-firstboot/Config.in"
 source "$BR2_EXTERNAL_POLIS_PATH/package/polis-wifi-setupd/Config.in"
 source "$BR2_EXTERNAL_POLIS_PATH/package/polis-dtmerge/Config.in.host"
+source "$BR2_EXTERNAL_POLIS_PATH/package/polis-dtoverlay/Config.in"
+source "$BR2_EXTERNAL_POLIS_PATH/package/polis-graphics-usb/Config.in"
+
+config BR2_POLIS_KERNEL_LOGO
+	bool "Embed the preconverted Polis kernel logo"
+	depends on BR2_LINUX_KERNEL
+	help
+	  Copy the supplied 512x512 CLUT224 PPM into the kernel before
+	  compilation. No host image converter is needed during builds.
 
 config BR2_POLIS_KERNEL_ENTRY
 	bool "Emit the Polis Linux entry benchmark marker"

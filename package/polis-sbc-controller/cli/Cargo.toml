@@ -12,3 +12,5 @@ tokio.workspace = true
 rmcp.workspace = true
 anyhow.workspace = true
 clap.workspace = true
+rustyline.workspace = true
+shlex.workspace = true

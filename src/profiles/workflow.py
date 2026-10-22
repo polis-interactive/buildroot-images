@@ -12,9 +12,24 @@ from .resolver import DOMAINS, digest, file_hash, read_kconfig, resolve, write_g
 
 
 def output_for(ctx, plan, explicit=None):
-    # Different input sets never inherit removed packages or old kernel objects.
-    mode = '-development' if plan.development else ''
-    return (explicit or ctx.repo / '.output' / f'{plan.profile.name}{mode}-{plan.fingerprint[:12]}').resolve()
+    # One working build tree; snapshots preserve completed versions.
+    return (explicit or ctx.repo / '.output').resolve()
+
+
+def reinstall_target(output):
+    """Repopulate the rootfs after selection changes, reusing compiled packages."""
+    pending = output / 'profile/reinstall-target'
+    if not pending.exists():
+        return
+    target = output / 'target'
+    if target.exists():
+        shutil.rmtree(target)
+    # Buildroot has no uninstall operation. Reinstall only selected packages
+    # into an empty rootfs so removed packages and old overlays cannot survive.
+    for stamp in (output / 'build').glob('*/.stamp_target_installed'):
+        stamp.unlink()
+    (output / 'build/packages-file-list.txt').unlink(missing_ok=True)
+    pending.unlink()
 
 
 def make_args(ctx, output):
@@ -121,7 +136,7 @@ def assert_current(ctx, plan, output, built=False):
         raise UserError(f'{output}: configure this profile first')
     state = json.loads(path.read_text())
     if state['fingerprint'] != plan.fingerprint:
-        raise UserError('Profile inputs changed after configuration; configure again in a fresh output directory')
+        raise UserError('Profile inputs changed after configuration; run configure again in this output directory')
     if state['generated'] != generated_hashes(output):
         raise UserError('Generated configuration changed after review; configure again')
     if built:
@@ -143,8 +158,8 @@ def configure(ctx, plan, output, display):
     state = output / 'profile/state.json'
     owner = output / 'profile/owner.json'
     if (output / '.config').exists():
-        if not owner.exists() or json.loads(owner.read_text())['fingerprint'] != plan.fingerprint:
-            raise UserError('Output belongs to another input set; choose a fresh --output or use the default')
+        if not owner.exists():
+            raise UserError('Output is not managed by this repository; choose --output or configure an empty directory')
     if state.is_file() and (output / 'profile/audit.json').is_file():
         try:
             assert_current(ctx, plan, output)
@@ -155,7 +170,10 @@ def configure(ctx, plan, output, display):
                 print((output / 'profile/audit.txt').read_text())
             print(f'Configuration audit: {output / "profile/audit.txt"} (unchanged; reused)')
             return
+    had_config = (output / '.config').is_file()
     requested = write_generated(ctx, plan, output)
+    if had_config:
+        (output / 'profile/reinstall-target').touch()
     save_json(output / 'profile/build-inputs.json', inputs.provenance(ctx, plan, pins))
     save_json(owner, dict(fingerprint=plan.fingerprint))
     audit = new_audit(plan)
@@ -213,6 +231,9 @@ def build(ctx, plan, output):
         audit['checks'][1].update(status='passed', detail='All requested kernel and BusyBox settings verified.')
         # Always run final hooks/assembly: static and image checks must be current.
         tracker.invalidate()
+        # Check cached component outputs before clearing target/, otherwise a
+        # reinstall would look like missing build output and force recompiles.
+        reinstall_target(output)
         run([*args, 'all'])
         for check in audit['checks'][2:]:
             check.update(status='passed', detail='Buildroot post-build/image hook completed successfully.')
@@ -264,7 +285,12 @@ def execute(ctx, action, name, explicit=None, snapshot_name=None, *, capture=Non
         return explicit.resolve()
     from .loader import load_profile
     from .resolver import profile_path
-    if Group.DEVELOPMENT_ACCESS in load_profile(profile_path(ctx.repo, name)).groups:
+    groups = load_profile(profile_path(ctx.repo, name)).groups
+    # Prepare generated artwork before resolve() hashes the reviewed inputs.
+    if action in ('configure', 'build', 'image') and Group.RPI4_VIDEO in groups:
+        from .logo import SOURCE, prepare
+        prepare(ctx.repo / SOURCE)
+    if Group.DEVELOPMENT_ACCESS in groups:
         if action in ('configure', 'image'):
             from .development import ensure_key
             ssh_public_key = ensure_key(ctx.repo, ssh_public_key)

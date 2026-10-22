@@ -2,10 +2,8 @@
 import importlib.util
 from contextlib import nullcontext
 import json
-import os
 from pathlib import Path
 import shutil
-import struct
 import subprocess
 import tempfile
 import unittest
@@ -34,8 +32,7 @@ class FakeTarget:
         return '12345678'
 
     def expand(self, directory):
-        self.calls.append('expand')
-        return dict(status='complete', bytes=1234)
+        raise AssertionError('Boot-time storage expansion is forbidden')
 
     def config(self):
         self.calls.append('config')
@@ -109,18 +106,18 @@ class FirstbootTests(unittest.TestCase):
         first = self.run_setup()
         self.assertEqual(first['status'], 'reboot-required')
         self.assertFalse(first['benchmark_eligible'])
-        self.assertEqual(self.target.calls, ['expand', 'config', 'prepare', 'stage', 'reboot'])
+        self.assertEqual(self.target.calls, ['config', 'prepare', 'stage', 'reboot'])
         self.target.before = self.target.after
         self.target.next_boot()
         second = self.run_setup()
         self.assertEqual(second['eeprom'], 'verified')
         self.assertFalse(second['benchmark_eligible'])
-        self.assertEqual(self.target.calls, ['expand', 'cleanup', 'config'])
+        self.assertEqual(self.target.calls, ['cleanup', 'config'])
         self.assertEqual(self.target.files, {})
         self.target.next_boot()
         third = self.run_setup()
         self.assertTrue(third['benchmark_eligible'])
-        self.assertEqual(self.target.calls, ['expand', 'config'])
+        self.assertEqual(self.target.calls, ['config'])
 
     def test_completed_record_does_not_hide_later_eeprom_changes(self):
         self.run_setup()
@@ -139,7 +136,7 @@ class FirstbootTests(unittest.TestCase):
         self.assertIn('cleanup', self.target.calls)
         self.target.next_boot()
         self.assertEqual(self.run_setup()['status'], 'failed')
-        self.assertEqual(self.target.calls, ['expand'])
+        self.assertEqual(self.target.calls, [])
 
     def test_interrupted_staging_cleans_partial_files_without_retry(self):
         self.target.fail_stage = True
@@ -155,23 +152,42 @@ class FirstbootTests(unittest.TestCase):
         self.run_setup()
         self.target.calls.clear()
         self.assertEqual(self.run_setup()['status'], 'failed')
-        self.assertEqual(self.target.calls, ['expand'])
+        self.assertEqual(self.target.calls, [])
 
-    def test_missing_or_matching_eeprom_settings_do_not_skip_expansion(self):
+    def test_no_boot_time_expansion_with_missing_or_matching_eeprom_settings(self):
         for settings in ({}, {'BOOT_UART': '1'}):
             with self.subTest(settings=settings):
                 self.config['settings'] = settings
-                self.target.calls.clear()
-                self.assertEqual(self.run_setup()['status'], 'complete')
-                self.assertIn('expand', self.target.calls)
-                self.assertNotIn('stage', self.target.calls)
+                self.target.next_boot()
+                result = self.run_setup()
+                self.assertEqual(result['status'], 'complete')
+                self.assertNotIn('data', result)
+                self.assertEqual(self.target.calls, ['config'] if settings else [])
+                self.assertFalse((self.root / 'storage').exists())
+
+    def test_legacy_storage_records_are_ignored_and_preserved(self):
+        storage = self.root / 'storage'
+        storage.mkdir()
+        record = storage / 'result.json'
+        record.write_text('{"status":"failed","bytes":1234}\n')
+        original = record.read_bytes()
+        self.config['settings'] = {}
+        for _ in range(2):
+            self.target.next_boot()
+            result = self.run_setup()
+            self.assertEqual(result['status'], 'complete')
+            self.assertTrue(result['benchmark_eligible'])
+            self.assertFalse(result['activity'])
+            self.assertEqual(self.target.calls, [])
+            self.assertNotIn('data', result)
+            self.assertEqual(record.read_bytes(), original)
 
     def test_unsupported_firmware_does_not_keep_preparing(self):
         self.target.unsupported = True
         self.assertEqual(self.run_setup()['status'], 'failed')
         self.target.next_boot()
         self.assertEqual(self.run_setup()['status'], 'failed')
-        self.assertEqual(self.target.calls, ['expand'])
+        self.assertEqual(self.target.calls, [])
 
     def test_merge_preserves_unrelated_settings_and_comments(self):
         before = '# board config\n[all]\nBOOT_ORDER=0xf41\nNET_INSTALL_ENABLED=1\n[none]\nFOO=bar\n'
@@ -183,27 +199,6 @@ class FirstbootTests(unittest.TestCase):
             fb.merge_config('[gpio8=1]\nNET_INSTALL_ENABLED=1\n', {'NET_INSTALL_ENABLED': '0'})
         with self.assertRaisesRegex(RuntimeError, 'Invalid'):
             fb.merge_config(before, {'NET_INSTALL_ENABLED': '0\nBOOT_ORDER=1'})
-
-    def test_mbr_growth_changes_only_data_length_and_is_idempotent(self):
-        raw = bytearray(512)
-        raw[510:] = b'\x55\xaa'
-        for n, (kind, start, size) in enumerate([(12, 2048, 4096), (131, 6144, 8192), (131, 14336, 4096)]):
-            raw[450 + n * 16] = kind
-            struct.pack_into('<II', raw, 454 + n * 16, start, size)
-        grown, parts = fb.grow_mbr(bytes(raw), 65536)
-        self.assertEqual(grown[:490], raw[:490])
-        self.assertEqual(grown[494:], raw[494:])
-        self.assertEqual(struct.unpack_from('<I', grown, 490)[0], 65536 - 14336)
-        self.assertEqual(fb.grow_mbr(grown, 65536)[0], grown)
-        for offset, value in [(510, 0), (498, 131), (466, 5)]:
-            invalid = raw.copy()
-            invalid[offset] = value
-            with self.assertRaises(RuntimeError):
-                fb.grow_mbr(bytes(invalid), 65536)
-        with self.assertRaises(RuntimeError):
-            fb.grow_mbr(bytes(raw), 15000)
-        with self.assertRaises(RuntimeError):
-            fb.grow_mbr(bytes(raw), 2**32)
 
     def test_installer_development_removes_payload_and_uses_no_python(self):
         target = self.root / 'target'
@@ -245,75 +240,6 @@ class FirstbootTests(unittest.TestCase):
             (boot / 'pieeprom.upd').write_text('pieeprom.upd')
             target.cleanup(hashes)
             self.assertEqual(list(boot.iterdir()), [])
-
-    @unittest.skipUnless(all(shutil.which(tool) for tool in ('mkfs.ext4', 'resize2fs', 'debugfs')),
-                         'ext4 test utilities unavailable')
-    def test_expansion_resumes_after_partition_growth_and_preserves_files(self):
-        disk, data, sys = self.root / 'disk', self.root / 'data.ext4', self.root / 'sys'
-        # Match the tested SD card's 3,584-byte tail with 4 KiB host pages.
-        sectors = 65543
-        capacity = (sectors - 8192) * 512
-        raw = bytearray(512)
-        raw[510:] = b'\x55\xaa'
-        parts = [(12, 2048, 2048), (131, 4096, 4096), (131, 8192, 16384)]
-        for n, (kind, start, size) in enumerate(parts, 1):
-            raw[434 + n * 16] = kind
-            struct.pack_into('<II', raw, 438 + n * 16, start, size)
-            (sys / f'mmcblk0p{n}').mkdir(parents=True)
-            (sys / f'mmcblk0p{n}/start').write_text(str(start))
-            (sys / f'mmcblk0p{n}/size').write_text(str(size))
-        (sys / 'queue').mkdir()
-        (sys / 'queue/logical_block_size').write_text('512')
-        (sys / 'device').mkdir()
-        (sys / 'device/cid').write_text('abc123')
-        (sys / 'size').write_text(str(sectors))
-        disk.write_bytes(raw)
-        with data.open('wb') as stream:
-            stream.truncate(8 * 1024**2)
-        subprocess.run(['mkfs.ext4', '-q', '-F', '-b', '1024', '-L', 'polis-data', str(data)], check=True)
-        payload = self.root / 'payload'
-        payload.write_text('persistent user data')
-        subprocess.run(['debugfs', '-w', '-R', f'write {payload} /kept', str(data)],
-                       check=True, capture_output=True)
-        original_command = fb.command
-        fail = True
-        calls = []
-        def run(*args):
-            nonlocal fail
-            calls.append(args[0])
-            if args[0] == 'partx':
-                (sys / 'mmcblk0p3/size').write_text(str(sectors - 8192))
-                with data.open('r+b') as stream:
-                    stream.truncate(capacity)
-                return ''
-            if fail:
-                fail = False
-                raise OSError('interrupted before filesystem resize')
-            return original_command(*args)
-        target = object.__new__(fb.Target)
-        target.activity = False
-        backup = self.root / 'storage'
-        with patch.object(fb, 'DISK', disk), patch.object(fb, 'DATA', data), \
-                patch.object(fb, 'SYS_DISK', sys), patch.object(fb, 'command', side_effect=run):
-            with self.assertRaisesRegex(OSError, 'interrupted'):
-                target.expand(backup)
-            # A successful command that leaves a genuinely undersized filesystem
-            # must still fail validation; page-tail tolerance cannot hide it.
-            with patch.object(fb, 'command', return_value=''):
-                with self.assertRaisesRegex(RuntimeError, 'Filesystem expansion incomplete'):
-                    target.expand(backup)
-            target.expand(backup)
-            calls.clear()
-            target.activity = False
-            result = target.expand(backup)
-        self.assertFalse(target.activity)
-        self.assertEqual(calls, [])
-        alignment = max(1024, os.sysconf('SC_PAGE_SIZE'))
-        self.assertEqual(result['bytes'], capacity // alignment * alignment)
-        self.assertGreaterEqual(capacity - result['bytes'], 1024)
-        self.assertEqual((backup / 'abc123/mbr-before.bin').read_bytes(), bytes(raw))
-        kept = subprocess.check_output(['debugfs', '-R', 'cat /kept', str(data)], stderr=subprocess.DEVNULL)
-        self.assertEqual(kept, payload.read_bytes())
 
     def test_upstream_tool_roundtrip_and_rollback_timestamp(self):
         source = REPO / '.local/usbboot/rpi-eeprom'

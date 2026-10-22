@@ -2,7 +2,7 @@
 # Target-side checks; record these before and after reboot.
 set -eu
 [ "$(uname -m)" = aarch64 ]
-[ "$(hostname)" = polis-dev ]
+[ "$(hostname)" = "$(cat /etc/hostname)" ]
 printf 'model='; tr -d '\000' </proc/device-tree/model; echo
 printf 'serial='; tr -d '\000' </proc/device-tree/serial-number; echo
 uname -a

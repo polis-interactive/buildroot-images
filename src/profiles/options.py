@@ -18,6 +18,7 @@ class Capability(StrEnum):
     DEVELOPMENT_SSH = "development-ssh"
     DISPLAY = "display"
     CAMERA = "camera"
+    USB_HOST = "usb-host"
 
 
 @unique
@@ -35,6 +36,10 @@ class Group(StrEnum):
     WIFI_IDENTITY = "wifi-identity"
     DEVELOPMENT_ACCESS = "development-access"
     RPI4_VIDEO = "rpi4-video"
+    RPI4_UART3 = "rpi4-uart3"
+    FFMPEG_LIBRARIES = "ffmpeg-libraries"
+    RPI4_USB_HOST = "rpi4-usb-host"
+    SCREEN_GRAPHICS_USB = "screen-graphics-usb"
     UART_DIAGNOSTICS = "uart-diagnostics"
     USB_DIAGNOSTICS = "usb-diagnostics"
     KERNEL_ENTRY_MARKER = "kernel-entry-marker"
@@ -45,6 +50,7 @@ class Group(StrEnum):
     NO_WIFI = "no-wifi"
     BLUETOOTH_UART_ROUTING = "bluetooth-uart-routing"
     USB_PERIPHERAL_ONLY = "usb-peripheral-only"
+    NO_USB = "no-usb"
     NO_INPUT = "no-input"
     NO_32BIT = "no-32bit"
     NO_CONTAINERS = "no-containers"

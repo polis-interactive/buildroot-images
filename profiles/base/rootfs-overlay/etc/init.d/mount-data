@@ -16,6 +16,7 @@ done
 mount /data
 /etc/init.d/polis-firstboot
 mkdir -p /data/config
+/etc/init.d/polis-hostname
 # Seed package-provided state once, preserving ownership and permissions.
 # Rename only after the copy finishes so a power loss retries the initialization.
 if [ ! -d /data/var-lib ]; then

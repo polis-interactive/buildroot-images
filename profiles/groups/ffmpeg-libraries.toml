@@ -1,0 +1,32 @@
+schema = 1
+id = "ffmpeg-libraries"
+description = "FFmpeg libraries for H.264/AAC/MP3/AC3 in MP4 files and audio resampling."
+
+[buildroot]
+# Use the pinned Buildroot package (6.1.5), including its staging installation.
+# Functionality follows ../2050-hdmi-passthru/tools/codec.py, not its version.
+"BR2_PACKAGE_FFMPEG" = "y"
+"BR2_PACKAGE_FFMPEG_GPL" = "n"
+"BR2_PACKAGE_FFMPEG_NONFREE" = "n"
+"BR2_PACKAGE_FFMPEG_FFMPEG" = "n"
+"BR2_PACKAGE_FFMPEG_FFPLAY" = "n"
+"BR2_PACKAGE_FFMPEG_FFPROBE" = "n"
+"BR2_PACKAGE_FFMPEG_XCBGRAB" = "n"
+"BR2_PACKAGE_FFMPEG_POSTPROC" = "n"
+"BR2_PACKAGE_FFMPEG_SWSCALE" = "n"
+"BR2_PACKAGE_FFMPEG_ENCODERS" = ""
+"BR2_PACKAGE_FFMPEG_DECODERS" = "h264 aac mp3 ac3"
+"BR2_PACKAGE_FFMPEG_MUXERS" = ""
+"BR2_PACKAGE_FFMPEG_DEMUXERS" = "mov"
+"BR2_PACKAGE_FFMPEG_PARSERS" = "h264 aac mpegaudio ac3"
+"BR2_PACKAGE_FFMPEG_BSFS" = ""
+"BR2_PACKAGE_FFMPEG_PROTOCOLS" = "file"
+"BR2_PACKAGE_FFMPEG_FILTERS" = ""
+"BR2_PACKAGE_FFMPEG_INDEVS" = "n"
+"BR2_PACKAGE_FFMPEG_OUTDEVS" = "n"
+# Buildroot enables avdevice/avfilter/network/hwaccels by default. Override
+# these at the end of its configure command; swresample has no Kconfig switch.
+# Disable autodetection and the recipe's explicit integrations with existing
+# libv4l/libdrm/zlib: this software decoder needs no external codec libraries.
+# Retain the profile's shared+static policy and Buildroot's cross/PIC settings.
+"BR2_PACKAGE_FFMPEG_EXTRACONF" = "--disable-autodetect --disable-programs --disable-network --disable-avdevice --disable-avfilter --disable-hwaccels --disable-v4l2-m2m --disable-libv4l2 --disable-libdrm --disable-zlib --enable-avcodec --enable-avformat --enable-avutil --enable-swresample"

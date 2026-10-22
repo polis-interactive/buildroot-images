@@ -46,7 +46,7 @@ After the package rename, rebuild/reflash the Pico so it advertises
 `Polis SBC Controller`, and rerun `make setup-permissions` to install the renamed
 udev policy and group. Restart the daemon with `make sbc-controller-daemon`.
 
-For initial hardware commissioning, `recovery-usb --confirm-fixture bench-rpi4b`
+For initial hardware commissioning, `recovery-usb`
 (MCP `recovery_usb`) cold-boots recovery and loads the pinned RAM gadget without
 writing storage. It requires qualified GPIO8 OTP, a pinned USB port/payload, and
 host USB permissions, but permits reflashing to remain disabled until the actual
@@ -152,8 +152,7 @@ verifies that image, and returns to normal boot:
 
 ```sh
 .target/debug/polis-sbc-controller --socket /private/state/daemon.sock --fixture bench-rpi4b \
-  run --image /absolute/path/candidate.img --sha256 IMAGE_SHA256 \
-  --confirm-fixture bench-rpi4b
+  run --image /absolute/path/candidate.img --sha256 IMAGE_SHA256
 ```
 
 Adding `--auto-recover` explicitly authorizes **one** flash of the configured
@@ -165,13 +164,53 @@ A run returns its ID promptly; use `status` to observe the current stage/result.
 or `interrupted` requires inspection. No action is automatically resumed after
 a daemon restart or a lost client response.
 
-Other commands are `power on|off --confirm-fixture NAME`,
-`cycle --off-ms 1000 --confirm-fixture NAME`,
+Other commands are `power on|off`,
+`cycle --off-ms 1000`,
 `console-read --after OFFSET --max-bytes 4096`, and `console-write TEXT`.
 Console read returns the next cursor and a gap indicator. Writes are at most
 128 UTF-8 bytes; these are raw UART bytes, not a shell-execution protocol.
 Power, cycle, console-write, and another run are refused while a workflow holds
 the fixture. Status and captured console reads remain available.
+
+## Interactive CLI
+
+From the repository root, open a session with:
+
+```sh
+make sbc-controller-cli
+# Explicit spelling: make sbc-controller-cli ARGS=repl
+```
+
+This builds only the host CLI and opens its REPL. The socket and fixture are
+selected once using `SBC_CONTROLLER_SOCKET` and `SBC_CONTROLLER_FIXTURE` (default
+`bench-rpi4b`). The prompt shows the fixture. Direct invocation accepts `repl`
+or no subcommand after `--socket PATH --fixture NAME`.
+
+```text
+polis[bench-rpi4b]> help
+polis[bench-rpi4b]> help console-read
+polis[bench-rpi4b]> status
+polis[bench-rpi4b]> console-read --max-bytes 2048
+polis[bench-rpi4b]> exit
+```
+
+All one-shot fixture commands and their arguments are available. `help COMMAND`
+and `COMMAND --help` use the same Clap definitions as the one-shot CLI. Help is
+also shown at startup and works without a running daemon. Responses remain
+pretty-printed JSON. Invalid input and daemon errors return to the prompt;
+requests are never retried automatically. CLI and REPL commands automatically use
+the selected fixture; no repeated `--confirm-fixture` argument is needed. Image
+paths still require the paired `--sha256`.
+
+The host-only `rustyline` library provides line editing, Up/Down history, and
+Ctrl-R history search. History lasts for the current session only. Ctrl-C at
+the prompt clears the current input; `exit`, `quit`, or Ctrl-D leaves the session.
+Ctrl-C during an outstanding request terminates the CLI and does not undo an
+accepted operation; inspect `status` before repeating it.
+`shlex` handles quoted arguments such as `console-write 'hello world'` and paths
+containing spaces. There is no shell execution, variable expansion, or automatic
+newline appended to UART text. Piped input is supported and EOF ends the session.
+Neither library is added to the Pi image or Pico firmware.
 
 ## First Pi UART connectivity check
 

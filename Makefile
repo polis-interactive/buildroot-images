@@ -40,7 +40,7 @@ else
 
 $(HELP_GOALS):
 ifeq ($(filter $(COMMANDS) $(SBC_CONTROLLER_COMMANDS),$(MAKECMDGOALS)),)
-	@printf '%s\n' 'Maintenance commands:' \
+	@printf '%s\n' 'Build directory: .output/ for every profile and mode; saved images: .snapshots/.' '' 'Maintenance commands:' \
 		'  make setup        Install Python dependencies, pinned usbboot tools, and RAM recovery payload' \
 		'  make setup-permissions  Install host udev rules and enroll SBC_CONTROLLER_USER via sudo' \
 		'  make test         Run host tests' \
@@ -52,7 +52,8 @@ ifeq ($(filter $(COMMANDS) $(SBC_CONTROLLER_COMMANDS),$(MAKECMDGOALS)),)
 		'  make sbc-controller-usb-test  Check direct laptop/Pi USB data exchange' \
 		'  make sbc-controller-diagnostics  Archive current Pi boot logs over USB' \
 		'  make sbc-controller-benchmark  Run five cold boots; reject provisioning boots or missing setup status' \
-		'  make sbc-controller-cli ARGS=status  Use the shared CLI/MCP frontend' \
+		'  make sbc-controller-cli    Open the interactive CLI; type help for commands' \
+		'  make sbc-controller-cli ARGS=status  Run one CLI command (ARGS=mcp for MCP)' \
 		'' 'Details: make sbc-controller-flash help | make sbc-controller-daemon help' ''
 	@$(UV) run src/main.py
 else
@@ -87,10 +88,12 @@ endif
 
 sbc-controller-cli sbc-controller-diagnostics sbc-controller-benchmark:
 ifneq ($(strip $(SBC_CONTROLLER_HELP)),)
-	@printf '%s\n' 'Usage: make sbc-controller-cli ARGS="status | console-read | ..."' \
+	@printf '%s\n' 'Usage: make sbc-controller-cli [ARGS="repl | status | console-read | ..."]' \
 		'       make sbc-controller-diagnostics' \
 		'       make sbc-controller-benchmark [ARGS="--samples 3"]' \
 		'CLI binary: package/polis-sbc-controller/.target/debug/polis-sbc-controller.' \
+		'No ARGS opens the REPL: help, help COMMAND, Up/Down history, exit or Ctrl-D to leave.' \
+		'Select the session with SBC_CONTROLLER_FIXTURE and SBC_CONTROLLER_SOCKET.' \
 		'Diagnostics reads the current boot capture. Benchmark cycles power (default: 5 boots); it never flashes.' \
 		'Requires the running daemon, schema-3 Pico firmware, and rebuilt diagnostic profile for benchmarks.' \
 		'Build hardware-debug images with make image ARGS="--profile polis-rpi4-speed --development" to skip first-boot setup.' \

@@ -58,11 +58,29 @@ For example, create `.local/wifi-setupd/password` with your chosen default, then
 make image ARGS="--profile polis-rpi4-base --buildroot /home/broosegoose/Software/buildroot-2026.08"
 ```
 
-Output: `.output/polis-rpi4-base-<input-hash>/images/sdcard.img`, plus the printed
+Output: `.output/images/sdcard.img`, plus the printed
 snapshot under `.snapshots/`. All devices flashed from this image initially use
 that password and setup SSID **Polis-Setup**. Base contains iwd, the portal and
 Avahi, without Ethernet DHCP or SSH. Dev adds Ethernet DHCP, SSH and its
 headless settings.
+
+Choose a distinct setup AP name per card without rebuilding:
+
+```sh
+make flash -- --ap-name Polis-Setup-2
+# Combine with the per-card LAN hostname on images supporting --hostname:
+make flash -- --hostname polis-dev-2 --ap-name Polis-Setup-2
+```
+
+`--ap-name` accepts 1–32 ASCII letters, digits, hyphens or underscores, starting
+with a letter or digit. It changes the SSID file and matching iwd AP filename
+together in a temporary copy of the data filesystem, then writes that copy to
+the confirmed card. The source image, password, AP network settings and
+unrelated router profiles are preserved. The old AP profile is removed from
+the card's copy; a collision with another existing AP profile is rejected.
+This option works with existing initialized Wi-Fi images and adds no target
+dependencies. Omitting it keeps the image's existing AP name. Normal flashing
+still replaces the entire destination card, including its previous data.
 
 The password is a tracked image input: changing it changes the output identity,
 and a staged build rejects changed inputs until reconfigured. A mode-0600 copy
@@ -136,7 +154,7 @@ rerun just the hook against that existing output directory (from the repository
 root). Substitute the failed build's actual directory below:
 
 ```sh
-out="$PWD/.output/polis-rpi4-base-<input-hash>"
+out="$PWD/.output"
 BASE_DIR="$out" BR2_EXTERNAL_POLIS_PATH="$PWD" \
 BINARIES_DIR="$out/images" HOST_DIR="$out/host" BUILD_DIR="$out/build" \
 "$out/host/bin/python3" profiles/post-image.py

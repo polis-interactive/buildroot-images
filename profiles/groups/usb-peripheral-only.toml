@@ -1,6 +1,7 @@
 schema = 1
 id = "usb-peripheral-only"
 description = "Remove USB host and input drivers that select it."
+disables = ["usb-host"]
 
 [kernel]
 "CONFIG_JOYSTICK_XPAD" = "n"

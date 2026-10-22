@@ -140,6 +140,19 @@ class SharedInputTests(unittest.TestCase):
         path.write_text(path.read_text() + '\n# unrelated edit\n')
         self.assertEqual(before, tracker.fingerprint(rule, {}))
 
+    def test_source_rules_ignore_wrapper_and_optimization_changes(self):
+        ctx = Context(REPO, self.ctx.buildroot, self.ctx.downloads, self.ctx.snapshots)
+        tracker = Tracker(ctx, 'fixture-empty', self.ctx.repo / 'output')
+        tracker.ctx = self.ctx
+        tracker.bindings['repo'] = str(self.ctx.repo)
+        rule = next(rule for rule in tracker.steps if rule['name'] == 'kernel-source')
+        before = tracker.fingerprint(rule, {'BR2_OPTIMIZE_S': 'y'})
+        (self.ctx.repo / 'src/profiles').mkdir(exist_ok=True)
+        (self.ctx.repo / 'src/profiles/workflow.py').write_text('wrapper change')
+        self.assertEqual(before, tracker.fingerprint(rule, {'BR2_OPTIMIZE_S': 'n'}))
+        (self.ctx.buildroot / 'linux/linux.mk').write_text('source recipe change')
+        self.assertNotEqual(before, tracker.fingerprint(rule, {'BR2_OPTIMIZE_S': 'n'}))
+
     @unittest.skipUnless(os.environ.get('POLIS_TEST_HOST_DIR'), 'set POLIS_TEST_HOST_DIR to built Buildroot host tools')
     def test_assembly_is_reproducible_with_real_filesystem_tools(self):
         host = Path(os.environ['POLIS_TEST_HOST_DIR']).resolve()
