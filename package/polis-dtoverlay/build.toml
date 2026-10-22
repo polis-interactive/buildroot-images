@@ -1,0 +1,7 @@
+[[steps]]
+name = "dtoverlay"
+when = "BR2_PACKAGE_POLIS_DTOVERLAY"
+targets = ["polis-dtoverlay-dirclean", "polis-dtoverlay"]
+inputs = ["package/polis-dtoverlay"]
+config = ["BR2_PACKAGE_POLIS_DTOVERLAY", "BR2_PACKAGE_DTC*"]
+outputs = ["{output}/build/polis-dtoverlay-*/.stamp_built", "{output}/target/usr/bin/dtoverlay"]

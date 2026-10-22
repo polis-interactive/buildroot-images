@@ -1,6 +1,6 @@
 schema = 1
 id = "wifi-identity"
-description = "Hostname and login banner for the temporary Wi-Fi appliance profile."
+description = "Hostname and login banner for the base Wi-Fi appliance."
 requires = ["wifi-iwd"]
 
 [buildroot]

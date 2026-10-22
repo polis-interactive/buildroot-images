@@ -7,18 +7,15 @@ import json
 import os
 from pathlib import Path
 import re
-import struct
 import subprocess
 import time
 
 FIRMWARE_VERSION = '57db150d63864d47e6c9071f6b086a5401eb4e92'
 FIRMWARE_SHA256 = '3bf21d52b020a7e76a5fe9903e714a7fb5272c0a3a7bc1c1410f9cf45ed8b933'
 ASSETS = Path('/usr/share/polis-firstboot')
-DISK = Path('/dev/mmcblk0')
 DATA = Path('/dev/mmcblk0p3')
 BOOT = Path('/run/polis-boot')
 STATUS = Path('/run/polis-provisioning.json')
-SYS_DISK = Path('/sys/class/block/mmcblk0')
 
 
 def require(condition, message):
@@ -83,42 +80,6 @@ def merge_config(before, settings):
         f'{key}={value}\n' for key, value in sorted(settings.items()))
 
 
-def grow_mbr(raw, sectors):
-    """Change only partition 3's length in an ordered, three-partition DOS table."""
-    require(len(raw) == 512 and raw[510:] == b'\x55\xaa', 'Expected an MBR')
-    require(0 < sectors <= 0xffffffff, 'Only SD cards up to 2 TiB are supported')
-    require(raw[494:510] == bytes(16), 'Unexpected fourth partition')
-    end, parts = 1, []
-    for number in range(3):
-        entry = raw[446 + 16 * number:462 + 16 * number]
-        start, size = struct.unpack_from('<II', entry, 8)
-        require(entry[0] in (0, 128) and entry[4] in ((6, 11, 12) if number == 0 else (131,)),
-                'Expected FAT boot, Linux root, and Linux data partitions')
-        require(start >= end and size > 0 and start + size <= sectors,
-                'Invalid or overlapping partition layout')
-        parts.append((start, size))
-        end = start + size
-    grown = bytearray(raw)
-    struct.pack_into('<I', grown, 490, sectors - parts[2][0])
-    return bytes(grown), parts
-
-
-def filesystem_size(path):
-    with path.open('rb') as stream:
-        stream.seek(1024)
-        sb = stream.read(1024)
-    require(len(sb) == 1024 and sb[56:58] == b'\x53\xef' and
-            sb[120:136].rstrip(b'\0') == b'polis-data', 'Expected polis-data ext4 filesystem')
-    incompat = struct.unpack_from('<I', sb, 96)[0]
-    require(incompat & 0x40, 'Expected ext4 extents')
-    block_size = 1024 << struct.unpack_from('<I', sb, 24)[0]
-    require(block_size in (1024, 2048, 4096), 'Unsupported ext4 block size')
-    blocks = struct.unpack_from('<I', sb, 4)[0]
-    if incompat & 0x80:
-        blocks += struct.unpack_from('<I', sb, 336)[0] << 32
-    return blocks * block_size, block_size
-
-
 class Target:
     def __init__(self):
         self.boot_id = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
@@ -132,52 +93,6 @@ class Target:
         require(os.stat('/data').st_dev == os.stat(DATA).st_rdev, '/data is not mounted from SD partition 3')
         require(os.stat('/data').st_dev != os.stat('/').st_dev, '/data must be separate from root')
         return serial
-
-    def expand(self, directory):
-        sys = SYS_DISK
-        require(int((sys / 'queue/logical_block_size').read_text()) == 512, 'Expected 512-byte sectors')
-        sectors = int((sys / 'size').read_text())
-        with DISK.open('rb') as stream:
-            raw = stream.read(512)
-        grown, parts = grow_mbr(raw, sectors)
-        for number, (start, _) in enumerate(parts, 1):
-            require(int((sys / f'mmcblk0p{number}/start').read_text()) == start,
-                    'Kernel partition start differs from MBR')
-            if number < 3:
-                require(int((sys / f'mmcblk0p{number}/size').read_text()) == parts[number - 1][1],
-                        'Kernel boot/root partition size differs from MBR')
-        current, block = filesystem_size(DATA)
-        capacity = (sectors - parts[2][0]) * 512
-        require(current <= parts[2][1] * 512, 'Filesystem exceeds data partition')
-        cid = (sys / 'device/cid').read_text().strip()
-        require(re.fullmatch('[0-9a-fA-F]+', cid), 'Missing SD card identity')
-        backup = directory / cid / 'mbr-before.bin'
-        if raw != grown:
-            self.activity = True
-            if not backup.exists():
-                atomic(backup, raw)
-            # Persist the backup's newly created ancestor directories as well.
-            os.sync()
-            # No partition starts or other partitions change. Preserve boot code and ID.
-            with DISK.open('r+b', buffering=0) as stream:
-                require(stream.read(512) == raw, 'Partition table changed during expansion')
-                stream.seek(0)
-                require(stream.write(grown) == 512, 'Short partition-table write')
-                os.fsync(stream.fileno())
-                stream.seek(0)
-                require(stream.read(512) == grown, 'Partition-table verification failed')
-        kernel_size = sys / 'mmcblk0p3/size'
-        if int(kernel_size.read_text()) * 512 != capacity:
-            self.activity = True
-            command('partx', '--update', '--nr', '3', DISK)
-            require(int(kernel_size.read_text()) * 512 == capacity, 'Kernel rejected data partition growth')
-        if capacity - current >= block:
-            self.activity = True
-            command('resize2fs', DATA)
-            current, block = filesystem_size(DATA)
-            require(0 <= capacity - current < block, 'Filesystem expansion incomplete')
-            os.sync()
-        return dict(status='complete', bytes=current, card=cid)
 
     def config(self):
         return command('vcgencmd', 'bootloader_config')
@@ -265,12 +180,6 @@ def provision(target, config, root):
     target.publish(report)
     try:
         serial = target.identity()
-        # Expansion completion is independent of the board's EEPROM settings.
-        storage = root / 'storage'
-        if not (storage / 'result.json').exists():
-            target.activity = True
-        report['data'] = target.expand(storage)
-        save(storage / 'result.json', report['data'])
         settings = config['settings']
         if settings:
             key = sha(json.dumps(settings, sort_keys=True).encode())

@@ -1,18 +1,43 @@
 # Pi 4 development image
 
+For HDMI capture and display development, use [`polis-rpi4-screen-dev`](screen-development-image.md).
+It reuses this profile's development features and replaces its headless restriction.
+
 Build `polis-rpi4-dev` in **BuildrootImages**. It inherits the musl toolchain,
 read-only EROFS root and ext4 `/data` layout. Ethernet uses the built-in BCMGENET
 and Broadcom PHY drivers with DHCP; iwd owns Wi-Fi association and addressing.
 The development profile includes system D-Bus, Pi Wi-Fi firmware, `iwctl`, the
 wifi-setupd portal, key-only Dropbear SSH, and Avahi. It does not select `no-ethernet`.
 
-The separate `polis-rpi4-wifi` profile exercises the same
+Both `polis-rpi4-dev` and `polis-rpi4-screen-dev` also select the explicitly
+approved runtime overlay utility `/usr/bin/dtoverlay` and its `libfdt` dependency
+under `/usr/lib`. The shared `development-access` group requires OF/configfs
+overlay support and installs the firmware overlay files. It does not install
+`dtc` command-line tools, `dtparam`, target `dtmerge`, or extra services. The
+utility uses writable `/tmp/.dtoverlays` for its runtime state. This package is
+selected by the dev profiles, not by the `--development` provisioning flag.
+
+The boot partition is not automatically mounted; use an explicit read-only
+mount and `dtoverlay -d` as shown in the
+[runtime overlay checks](screen-development-image.md#can-the-existing-image-run-dtoverlay-uart3-temporarily).
+Only the screen profile persistently enables the Pico's UART3; the headless
+dev profile leaves UART3 disabled until requested. Rebuild each profile to get
+the utility; existing images are unchanged. Both use `.output/images/sdcard.img`,
+so retain the first build's printed snapshot before building the other:
+
+```sh
+make image ARGS="--profile polis-rpi4-dev --development"
+make image ARGS="--profile polis-rpi4-screen-dev --development"
+```
+
+The `polis-rpi4-base` profile includes the same
 [`polis-wifi-setupd` package](../package/polis-wifi-setupd/README.md) without
-Ethernet or development access. It uses `polis.local`; dev retains
+Ethernet DHCP or development access. It uses `polis.local`; dev retains
 `polis-dev.local`. Both require `POLIS_WIFI_SETUP_PASSWORD` or
 `.local/wifi-setupd/password` when configuring/building; the image contains the
-matching AP and portal password files. Base stays minimal until the temporary Wi-Fi profile passes
-hardware acceptance. Integrated build and hardware acceptance remain unverified.
+matching AP and portal password files. The integration was promoted after
+user-confirmed successful testing. Build and boot
+verification of the promoted base profile remains separate.
 
 ## Build and identify
 
@@ -31,8 +56,9 @@ To use an existing public key, pass `--ssh-public-key /absolute/path/key.pub`
 to every staged configure/build/snapshot command. A private-key file is rejected.
 Keep the generated private key to access this image on later boots.
 
-`--development` is the existing provisioning-mode flag: it skips EEPROM setup
-and automatic data-partition expansion. The **profile** selects the development
+`--development` is the existing provisioning-mode flag: it skips EEPROM setup.
+No image resizes storage on boot; expansion belongs to host provisioning.
+The **profile** selects the development
 packages. Selecting this flag on the speed profile does not add SSH or Ethernet.
 Use the same mode and public key when rebuilding. No build command flashes a card.
 
@@ -73,7 +99,12 @@ build. The intended Pi must boot this installed SD image before those checks.
 
 ## Find and connect
 
-The hostname is `polis-dev`. Avahi advertises **`polis-dev.local` on Ethernet
+The default hostname is `polis-dev`. Use `make flash -- --hostname polis-2` for
+a second Pi; this requires an image with the updated startup scripts. See the
+[flashing guide](../README.md#snapshots-flashing-and-smoke-tests) for the one-time
+image update and changing a name on a running Pi. `polis-dev-check` validates
+the active name against `/etc/hostname`, including this override.
+Avahi advertises **`polis-dev.local` on Ethernet
 (`eth0`) and Wi-Fi (`wlan0`)**, using each interface's current IPv4 address;
 there is no fixed IP in the image. Wi-Fi must already have an address. Avahi
 tracks interface/address changes, including Wi-Fi reconnects. IPv6 transport

@@ -39,7 +39,7 @@ class ToolsTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def output(self, profile='polis-rpi4-speed'):
-        output = self.repo / '.output' / (profile + '-0123456789ab')
+        output = self.repo / '.output'
         (output / 'profile').mkdir(parents=True, exist_ok=True)
         (output / 'profile/defconfig').write_text('BR2_aarch64=y\n')
         (output / '.config').write_text(f'BR2_DEFCONFIG="{output}/profile/defconfig"\n')
@@ -127,10 +127,11 @@ class ToolsTest(unittest.TestCase):
         image = self.image(self.output())
         self.image(self.repo / '.output/polis_rpi4')
         self.image(self.repo / '.output/polis-rpi4-speed-no-audit')
-        failed = self.output('polis-rpi4-base')
-        self.image(failed)
-        (failed / 'profile/audit.json').write_text(json.dumps(dict(profile='polis-rpi4-base', state='failed')))
         self.assertEqual(images.discover_images(self.ctx), [image])
+        audit = self.repo / '.output/profile/audit.json'
+        audit.write_text(json.dumps(dict(profile='polis-rpi4-base', state='failed')))
+        self.assertEqual(images.discover_images(self.ctx), [])
+        audit.write_text(json.dumps(dict(profile='polis-rpi4-speed', state='built')))
         saved = snapshots.snapshot(self.ctx, image.parent.parent, 'complete')
         self.assertEqual(images.discover_images(self.ctx, image.parent.parent), sorted([image, saved / 'images/sdcard.img']))
 

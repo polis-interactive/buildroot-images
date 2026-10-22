@@ -1,4 +1,4 @@
-"""Development image authorization, isolation and state installation boundaries."""
+"""Development-access authorization, isolation and state installation boundaries."""
 import importlib.util
 import json
 import os
@@ -13,7 +13,8 @@ from unittest.mock import patch
 
 from src.common import Context, UserError
 from src.profiles import development, inputs, resolver
-from src.profiles.options import Group
+from src.profiles.options import Group, Capability
+from profile_fixtures import DEVELOPMENT_GROUPS, prepare_repo, write_profile
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -27,10 +28,12 @@ class DevelopmentTests(unittest.TestCase):
         (br / 'configs').mkdir(parents=True)
         (br / 'Makefile').write_text('BR2_VERSION_EPOCH = 1788535000\n')
         shutil.copy(REPO / 'profiles/base/upstream_defconfig', br / 'configs/raspberrypi4_64_defconfig')
-        self.ctx = Context(REPO, br, br / 'dl', self.root / '.snapshots')
+        repo = self.root / 'repo'
+        prepare_repo(repo)
+        self.ctx = Context(repo, br, br / 'dl', self.root / '.snapshots')
         self.key = development.ensure_key(self.root)
 
-    def plan(self, name='polis-rpi4-dev', **kwargs):
+    def plan(self, name='fixture-development', **kwargs):
         with patch.object(resolver, 'input_manifest', return_value=[]):
             return resolver.resolve(self.ctx, name, **kwargs)
 
@@ -47,23 +50,12 @@ class DevelopmentTests(unittest.TestCase):
             development.ensure_key(self.root)
         self.assertEqual(private.read_bytes(), before)
 
-    def test_dev_keeps_layout_and_excludes_speed_restriction(self):
-        plan = self.plan(ssh_public_key=self.key)
-        for symbol in ('BR2_REPRODUCIBLE', 'BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_AARCH64_MUSL_STABLE',
-                       'BR2_TARGET_ROOTFS_EROFS', 'BR2_PACKAGE_IWD', 'BR2_PACKAGE_DBUS',
-                       'BR2_PACKAGE_READLINE', 'BR2_PACKAGE_DROPBEAR', 'BR2_PACKAGE_AVAHI_DAEMON',
-                       'BR2_PACKAGE_POLIS_WIFI_SETUPD'):
-            self.assertEqual(plan.values['buildroot'][symbol], 'y', symbol)
-        self.assertEqual(plan.values['buildroot']['BR2_TARGET_GENERIC_HOSTNAME'], 'polis-dev')
-        self.assertEqual(plan.values['kernel']['CONFIG_BCMGENET'], 'y')
-        self.assertNotIn('no-ethernet', plan.groups)
-        self.assertNotIn('BR2_PACKAGE_DROPBEAR', self.plan('polis-rpi4-base').values['buildroot'])
-        self.assertNotIn('BR2_PACKAGE_READLINE', self.plan('polis-rpi4-speed').values['buildroot'])
-        profile = resolver.load_profile(REPO / 'profiles/polis-rpi4-dev.toml')
-        from dataclasses import replace
-        with patch.object(resolver, 'load_profile', return_value=replace(profile, groups=(*profile.groups, Group.NO_ETHERNET))):
-            with self.assertRaisesRegex(UserError, 'ethernet is disabled'):
-                self.plan(ssh_public_key=self.key)
+    def test_development_access_rejects_ethernet_restriction(self):
+        write_profile(self.ctx.repo, 'fixture-conflict',
+                      (*DEVELOPMENT_GROUPS, Group.NO_ETHERNET),
+                      (Capability.ETHERNET,))
+        with self.assertRaisesRegex(UserError, 'ethernet is disabled'):
+            self.plan('fixture-conflict', ssh_public_key=self.key)
 
     def test_public_key_is_a_fingerprinted_input_not_private_material(self):
         plan = self.plan(ssh_public_key=self.key)
@@ -77,7 +69,7 @@ class DevelopmentTests(unittest.TestCase):
         self.assertEqual((output / 'profile/authorized_keys').read_text(), development.public_key(self.key))
         self.assertNotIn('PRIVATE KEY', ''.join(p.read_text() for p in (output / 'profile').iterdir()))
         with self.assertRaisesRegex(UserError, 'requires the development-access'):
-            self.plan('polis-rpi4-base', ssh_public_key=self.key)
+            self.plan('fixture-empty', ssh_public_key=self.key)
 
     def test_different_buildroot_inputs_are_rejected(self):
         with self.assertRaisesRegex(UserError, 'Buildroot inputs differ'):

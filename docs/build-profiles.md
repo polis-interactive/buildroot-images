@@ -7,15 +7,19 @@ the differences; staged configuration displays the differences before building.
 
 The CLI consumes [`polis-rpi4-base`](../profiles/polis-rpi4-base.toml),
 [`polis-rpi4-dev`](../profiles/polis-rpi4-dev.toml),
-[`polis-rpi4-wifi`](../profiles/polis-rpi4-wifi.toml), and
-[`polis-rpi4-speed`](../profiles/polis-rpi4-speed.toml). The Wi-Fi setup profile
-is a temporary non-development image pinned to wifi-setupd 0.1.3 and its release portal; see
-the [package guide](../package/polis-wifi-setupd/README.md).
+[`polis-rpi4-screen-dev`](../profiles/polis-rpi4-screen-dev.toml), and
+[`polis-rpi4-speed`](../profiles/polis-rpi4-speed.toml).
+Base now includes the user-tested Wi-Fi integration pinned to wifi-setupd 0.1.3
+and its release portal; see the [package guide](../package/polis-wifi-setupd/README.md).
 The speed profile selects the optimized kernel, firmware, image layout and
-EEPROM settings and excludes Wi-Fi. Base stays minimal pending successful
-Wi-Fi hardware acceptance. Dev selects the same Wi-Fi stack plus Ethernet and
+EEPROM settings and excludes Wi-Fi. Base provides `polis.local` without SSH or
+Ethernet DHCP.
+Dev selects the same Wi-Fi stack plus Ethernet and
 SSH, retaining its headless settings and separate hostname. These profiles all
 compose groups over `polis-rpi4-v1`; they do not inherit other profile TOML files.
+Screen-dev reuses dev's feature groups and replaces `headless` with `rpi4-video`
+for direct KMS graphics and TC358743 capture. Its shared graphics libraries
+coexist with the static-core policy; see the [bring-up guide](screen-development-image.md).
 Commands and EEPROM preparation are documented in the
 [README](../README.md#declarative-build-profiles).
 
@@ -50,8 +54,11 @@ component rules. Only the selected profile and selected groups' definitions and
 payloads enter the profile-input portion of the fingerprint; editing an unselected
 profile or its overlay does not invalidate another profile. Shared build code,
 packages, board support and patches remain conservatively tracked across profiles.
-Relevant source changes still select an isolated output directory, preserving the
-existing protection against removed packages and stale kernel objects.
+All profiles, modes and input revisions use `.output/`. Source changes refresh
+affected components in place; snapshots preserve completed images. After
+reconfiguration the next build clears only `target/` and target-install stamps,
+then reinstalls selected packages using their existing compiled objects. This
+removes obsolete packages and overlay files without discarding the build cache.
 
 Repeated configuration reuses a verified unchanged `.config` and audit instead of
 rerunning defconfig. Generated fragments are written only when their contents
@@ -65,8 +72,8 @@ component configs and snapshot source archive retain the build evidence. The
 public-key digest is included only for profiles with development SSH access.
 Changing Git revision or file mtimes alone is not a compilation input.
 
-This migration changes fingerprint calculation, so the first build after updating
-uses a new output directory. Subsequent unchanged builds reuse that directory.
+Input fingerprints are cache and provenance metadata, never output-directory
+names. No profile or input change creates a new default build directory.
 Build commands stay the same; no full builds are run during agent validation.
 
 ## The comparison base
@@ -100,8 +107,9 @@ or `DT_NEEDED` entry fails verification. Dynamic linking remains available to
 other packages; this is not global `BR2_STATIC_LIBS=y`.
 
 `check-static.py` reads Buildroot's selected packages to determine the checked
-executable set. The base does not enable Wi-Fi or the collector to satisfy
-the checker. The static check runs after all profile post-build hooks.
+executable set. The shared `polis-rpi4-v1` core does not enable Wi-Fi or the
+collector to satisfy the checker; the base image selects Wi-Fi explicitly.
+The static check runs after all profile post-build hooks.
 
 `premerge-overlays` selects the host-only `polis-dtmerge` package, built against
 Buildroot's host libfdt. It does not select target diagnostic utilities.
@@ -188,14 +196,18 @@ The implemented boundaries are:
 | --- | --- |
 | Base groups | Musl toolchain, EROFS/read-only storage layout, static core policy |
 | Product features | Application/runtime services, Wi-Fi, boot diagnostics, UART/USB diagnostics, benchmark instrumentation |
+| `rpi4-uart3` | Official BCM2711 UART3 overlay on BCM4/5 for the Pico control surface; application-owned serial port, no console or getty. See [wiring and tests](screen-development-image.md#pico-control-surface-on-uart3). |
+| `ffmpeg-libraries` | Upstream FFmpeg 6.1.5 libraries and staging development files for software H.264/AAC/MP3/AC3 decoding, MP4 file input and resampling. Selected only by `polis-rpi4-screen-dev`; no FFmpeg CLI programs or new external target dependencies. See [SDK integration](screen-development-image.md#ffmpeg-libraries-and-sdk-integration). |
+| `rpi4-usb-host` | Pi 4 USB-A VL805/xHCI and built-in CDC ACM with firmware-reset prerequisites; excludes gadget diagnostics and unrelated USB peripheral drivers. |
+| `screen-graphics-usb` | Existing BusyBox mdev events start one supervised `hdmi-graphics-hello` per matching Pico. Requires a prepared app payload; see [graphics USB](screen-development-image.md#graphics-usb-on-the-usb-a-host-ports). |
 | Capability restrictions | Headless configuration, no Ethernet, UART/Bluetooth routing, USB peripheral-only operation, no input, no 32-bit compatibility/containers/alternate storage |
 | Independent optimizations | Compiler size optimization, debug instrumentation trimming, no cron, HAT/PoE probe skips, LZ4 kernel, premerged overlays, boot ramdisk |
-| Board provisioning | First-boot EEPROM configuration and `/data` expansion enabled by default; `--development` disables both. Capture-based `prepare-eeprom` / `image --capture` remain optional. |
+| Board provisioning | First-boot EEPROM configuration enabled by default; `--development` disables it. Storage is never resized on boot; expand `/data` during host provisioning. Capture-based `prepare-eeprom` / `image --capture` remain optional. |
 
 Use descriptive identifiers; experiment IDs remain only as evidence references.
 The CLI's `--development` mode is an input to the build fingerprint, applies to
-staged configure/build/snapshot/audit as well as image, and uses separate default
-outputs. Output ownership rejects switching modes in an existing build tree.
+staged configure/build/snapshot/audit as well as image. Both modes share
+`.output/`; reconfiguration switches the active selection in place.
 The target configuration and `images/provisioning.json` declare the mode;
 automatic snapshots include `final` or `development` in their name.
 First-boot status is captured separately from readiness and excluded from normal
@@ -289,9 +301,9 @@ again before recording success. A changed input requires configuration again;
 automatic mode performs that step itself. Never silently regenerate a reviewed
 staged plan or snapshot artifacts from a failed or stale plan.
 
-Generated files stay under a profile-specific output directory. Incompatible
-toolchain changes and package removals require fresh build state; a profile name
-alone is insufficient to prove that an existing output is reusable. Integrate
+Generated files stay under `.output/profile/` (or explicit `--output`). Package
+removals repopulate the target rootfs; incompatible toolchain changes still need
+a clean build in the same directory. Integrate
 these decisions with the existing incremental build tracker and directory lock.
 
 Save the profile, base declaration, resolved group inputs, generated configs,

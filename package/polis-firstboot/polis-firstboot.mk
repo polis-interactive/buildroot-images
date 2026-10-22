@@ -1,3 +1,9 @@
+################################################################################
+#
+# polis-firstboot
+#
+################################################################################
+
 POLIS_FIRSTBOOT_VERSION = ded1e9332bd996f6adc46e10d22d9ef0298b1882
 POLIS_FIRSTBOOT_SITE = https://raw.githubusercontent.com/raspberrypi/rpi-eeprom/$(POLIS_FIRSTBOOT_VERSION)
 POLIS_FIRSTBOOT_SOURCE = rpi-eeprom-config
@@ -6,7 +12,7 @@ POLIS_FIRSTBOOT_EXTRA_DOWNLOADS = \
 	$(POLIS_FIRSTBOOT_SITE)/LICENSE
 POLIS_FIRSTBOOT_LICENSE = BSD-3-Clause
 POLIS_FIRSTBOOT_LICENSE_FILES = LICENSE
-POLIS_FIRSTBOOT_DEPENDENCIES = python3 e2fsprogs util-linux boot-diagnostics-tools
+POLIS_FIRSTBOOT_DEPENDENCIES = python3 boot-diagnostics-tools
 
 define POLIS_FIRSTBOOT_EXTRACT_CMDS
 	cp $(POLIS_FIRSTBOOT_DL_DIR)/rpi-eeprom-config $(@D)/

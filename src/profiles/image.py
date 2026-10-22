@@ -104,7 +104,8 @@ def assemble(env=None):
                         str(build / 'polis-lz4-loader')], check=True, env=env)
     if plan['premerge']:
         subprocess.run(['python3', str(repo / 'board/rpi4/premerge-dtb.py'), str(images),
-                        str(images / 'bcm2711-rpi-4-b.premerged.dtb'), str(build), str(host)], check=True, env=env)
+                        str(images / 'bcm2711-rpi-4-b.premerged.dtb'), str(build), str(host),
+                        *plan['firmware_overlays']], check=True, env=env)
     if plan['ramdisk']:
         config = (images / 'rpi-firmware/config.txt').read_text()
         (images / 'boot-ramdisk-config.txt').write_text(config.rstrip() + '\nboot_ramdisk=1\n')
@@ -139,10 +140,10 @@ def assemble(env=None):
     provisioning = dict(schema=1, profile=plan['profile'], plan_sha256=plan['fingerprint'],
                         enabled=not plan['development'], settings=plan['eeprom'],
                         mode='development' if plan['development'] else 'final',
-                        expand_data=not plan['development'],
+                        expand_data=False,
                         status='disabled' if plan['development'] else 'pending-first-boot',
                         scope='first-boot',
-                        note='Target verifies EEPROM settings and expands /data. Development mode does not revert existing board settings.')
+                        note='Target verifies EEPROM settings only; expand /data during host provisioning. Development mode does not revert existing board settings.')
     (images / 'provisioning.json').write_text(json.dumps(provisioning, indent=2) + '\n')
     (output / 'profile/image-result.json').write_text(json.dumps(dict(boot_ramdisk_mib=size), indent=2) + '\n')
 

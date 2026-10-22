@@ -53,6 +53,8 @@ class Tracker:
                 raise UserError(f'{self.manifest}: every rule needs targets and outputs')
             if 'when' in rule and not isinstance(rule['when'], str):
                 raise UserError(f'{self.manifest}: when must name a config symbol')
+            if not isinstance(rule.get('inherit_defaults', True), bool):
+                raise UserError(f'{self.manifest}: inherit_defaults must be a boolean')
             for target in rule['targets']:
                 if not re.fullmatch(r'[A-Za-z0-9_{][A-Za-z0-9_{}.-]*', target):
                     raise UserError(f'Invalid Make target in build rule: {target!r}')
@@ -181,7 +183,7 @@ class Tracker:
         return digest(records), complete
 
     def fingerprint(self, rule, config, dependencies=None):
-        defaults = self.policy.get('defaults', {})
+        defaults = self.policy.get('defaults', {}) if rule.get('inherit_defaults', True) else {}
         patterns = [*defaults.get('inputs', []), *rule.get('inputs', [])]
         for key in rule.get('config_paths', []):
             # Split before expanding: a repository path containing spaces is
@@ -198,7 +200,8 @@ class Tracker:
         return digest(dict(rule=rule, inputs=inputs, config=selected,
                            variables=self.policy.get('variables', {}),
                            exclude=self.policy.get('exclude', []),
-                           context=self.bindings, dependencies=dependencies or {}))
+                           context={k: v for k, v in self.bindings.items() if k != 'profile'},
+                           dependencies=dependencies or {}))
 
     def current(self, name, fingerprint, rule):
         outputs, complete = self.files_digest(rule['outputs'], outputs=True)

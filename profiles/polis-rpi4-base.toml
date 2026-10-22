@@ -2,5 +2,5 @@
 schema = 1
 name = "polis-rpi4-base"
 base = "polis-rpi4-v1"
-requires = []
-groups = []
+requires = ["wifi", "wifi-setup-portal"]
+groups = ["wifi-iwd", "wifi-setupd", "wifi-identity"]

@@ -14,8 +14,9 @@ from unittest.mock import patch
 
 from src.common import Context, UserError
 from src.profiles import inputs, resolver, workflow, provision
-from src.profiles.image import recipe
+from src.profiles.image import assemble, recipe
 from src.profiles.options import BASE_GROUPS, Capability, Group
+from profile_fixtures import PREMERGE_GROUPS, WIFI_GROUPS, prepare_repo, write_profile
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -29,84 +30,43 @@ class ProfileBuildTests(unittest.TestCase):
         (br / 'configs').mkdir(parents=True)
         (br / 'Makefile').write_text('BR2_VERSION_EPOCH = 1788535000\n')
         shutil.copy2(REPO / 'profiles/base/upstream_defconfig', br / 'configs/raspberrypi4_64_defconfig')
-        self.ctx = Context(REPO, br, br / 'dl', self.root / '.snapshots')
+        repo = self.root / 'repo'
+        prepare_repo(repo)
+        self.ctx = Context(repo, br, br / 'dl', self.root / '.snapshots')
         self.output = self.root / '.output'
         manifest = patch.object(resolver, 'input_manifest', return_value=[
-            dict(root='repo', path='profiles/polis-rpi4-speed.toml', sha256='a' * 64)])
+            dict(root='repo', path='profiles/fixture-eeprom.toml', sha256='a' * 64)])
         manifest.start()
         self.addCleanup(manifest.stop)
         self.enterContext(patch.object(inputs, 'verify_inputs', return_value=
                                       json.loads((REPO / inputs.LOCK_PATH).read_text())))
 
-    def plan(self, name='polis-rpi4-speed', groups=None, requires=None):
-        if groups is None and requires is None:
-            return resolver.resolve(self.ctx, name)
-        profile = resolver.load_profile(REPO / 'profiles' / (name + '.toml'))
-        if groups is not None:
-            profile = replace(profile, groups=tuple(groups))
-        if requires is not None:
-            profile = replace(profile, requires=tuple(requires))
-        with patch.object(resolver, 'load_profile', return_value=profile):
-            return resolver.resolve(self.ctx, name)
+    def plan(self, name='fixture-eeprom', groups=None, requires=None):
+        if groups is not None or requires is not None:
+            name = 'fixture-selection'
+            write_profile(self.ctx.repo, name, groups or (), requires or ())
+        return resolver.resolve(self.ctx, name)
 
     def test_every_enum_has_a_valid_manifest(self):
         for group in Group:
             self.assertEqual(resolver.load_group(REPO, group)['id'], group.value)
 
-    def test_base_has_no_optional_features_or_restrictions(self):
-        p = self.plan('polis-rpi4-base')
-        self.assertEqual(set(p.groups), {g.value for g in BASE_GROUPS})
-        self.assertNotIn('gpu_mem', p.values['firmware'])
-        self.assertNotIn('CONFIG_DRM', p.values['kernel'])
-        br = resolver.write_generated(self.ctx, p, self.output)
-        for name in ('BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_AARCH64_MUSL_STABLE',
-                     'BR2_TARGET_ROOTFS_EROFS', 'BR2_POLIS_PREFER_STATIC'):
-            self.assertEqual(br[name], 'y')
-        self.assertEqual(p.values['busybox']['CONFIG_STATIC'], 'y')
-        self.assertNotIn('BR2_PACKAGE_POLIS_BOOT_DIAGNOSTICS', br)
-        self.assertNotIn('BR2_POLIS_KERNEL_ENTRY', br)
-        self.assertNotIn('BR2_PACKAGE_IWD', br)
-        image = json.loads((self.output / 'profile/image-plan.json').read_text())
-        self.assertFalse(any(image[k] for k in ('lz4', 'cutdown', 'premerge', 'ramdisk', 'eeprom')))
-
-    def test_speed_selects_all_optimizations_and_eeprom_settings(self):
-        p = self.plan()
-        resolver.write_generated(self.ctx, p, self.output)
-        image = json.loads((self.output / 'profile/image-plan.json').read_text())
-        self.assertTrue(all(image[k] for k in ('lz4', 'cutdown', 'premerge', 'ramdisk', 'eeprom')))
-        self.assertEqual(p.values['firmware']['gpu_mem'], '16')
-        self.assertEqual(p.values['buildroot']['BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI4_CD'], 'y')
-        firmware = (self.output / 'profile/config.txt').read_text()
-        self.assertNotIn('dtoverlay=', firmware)
-        self.assertNotIn('start_file=', firmware)
-        self.assertEqual(workflow.new_audit(p)['hardware'][0]['expected'], '0')
-        self.assertEqual(p.values['kernel']['CONFIG_QUOTA'], 'y')
-        self.assertEqual(p.values['kernel']['CONFIG_EXT4_FS'], 'y')
-
-    def test_wifi_profile_is_non_development_and_base_stays_minimal(self):
-        wifi = self.plan('polis-rpi4-wifi')
-        self.assertFalse(wifi.development)
-        self.assertNotIn('development-access', wifi.groups)
-        self.assertNotIn('headless', wifi.groups)
-        self.assertEqual(wifi.values['buildroot']['BR2_PACKAGE_POLIS_FIRSTBOOT'], 'y')
-        for symbol in ('BR2_PACKAGE_IWD', 'BR2_PACKAGE_POLIS_WIFI_SETUPD',
-                       'BR2_PACKAGE_AVAHI_DAEMON'):
-            self.assertEqual(wifi.values['buildroot'][symbol], 'y')
-            self.assertNotIn(symbol, self.plan('polis-rpi4-base').values['buildroot'])
-        self.assertNotIn('BR2_PACKAGE_DROPBEAR', wifi.values['buildroot'])
-        self.assertEqual(wifi.values['buildroot']['BR2_TARGET_GENERIC_HOSTNAME'], 'polis')
-        self.assertEqual(wifi.values['kernel']['CONFIG_ETHERNET'], 'n')
-        self.assertIn('board/rpi4/install-wifi.py', wifi.post_build)
-        self.assertNotIn('board/rpi4/install-development.py', wifi.post_build)
-        self.assertNotIn('etc/init.d/S90dev-app', wifi.values['rootfs'])
+    def test_shared_core_generates_static_erofs_configuration(self):
+        plan = self.plan('fixture-empty')
+        self.assertEqual(set(plan.groups), {g.value for g in BASE_GROUPS})
+        br = resolver.write_generated(self.ctx, plan, self.output)
+        for symbol in ('BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_AARCH64_MUSL_STABLE',
+                       'BR2_TARGET_ROOTFS_EROFS', 'BR2_POLIS_PREFER_STATIC'):
+            self.assertEqual(br[symbol], 'y')
+        self.assertEqual(plan.values['busybox']['CONFIG_STATIC'], 'y')
 
     def test_wifi_password_is_a_reviewed_input_without_plaintext_in_audits(self):
         with patch.dict(os.environ, POLIS_WIFI_SETUP_PASSWORD='image-password123'):
-            first = self.plan('polis-rpi4-wifi')
-            base = self.plan('polis-rpi4-base')
+            first = self.plan(groups=WIFI_GROUPS)
+            without_wifi = self.plan('fixture-empty')
         with patch.dict(os.environ, POLIS_WIFI_SETUP_PASSWORD='different-password456'):
-            second = self.plan('polis-rpi4-wifi')
-            self.assertEqual(base.fingerprint, self.plan('polis-rpi4-base').fingerprint)
+            second = self.plan(groups=WIFI_GROUPS)
+            self.assertEqual(without_wifi.fingerprint, self.plan('fixture-empty').fingerprint)
         self.assertNotEqual(first.fingerprint, second.fingerprint)
         self.assertNotIn(first.wifi_password, repr(first))
         self.assertNotIn(first.wifi_password, json.dumps(workflow.new_audit(first)))
@@ -119,47 +79,37 @@ class ProfileBuildTests(unittest.TestCase):
         self.assertEqual(path.stat().st_mtime_ns, before)
 
     def test_missing_wifi_password_fails_before_buildroot_configuration(self):
-        plan = replace(self.plan('polis-rpi4-wifi'), wifi_password='')
+        plan = replace(self.plan(groups=WIFI_GROUPS), wifi_password='')
         with patch.object(workflow, 'run') as run:
             with self.assertRaisesRegex(UserError, 'POLIS_WIFI_SETUP_PASSWORD'):
                 workflow.configure(self.ctx, plan, self.output, False)
             run.assert_not_called()
 
-    def test_speed_excludes_wifi_services_firmware_and_kernel_drivers(self):
-        speed = self.plan()
+    def test_no_wifi_group_excludes_services_firmware_and_kernel_drivers(self):
+        without_wifi = self.plan(groups=[Group.NO_WIFI])
         for symbol in ('BR2_PACKAGE_IWD', 'BR2_PACKAGE_POLIS_WIFI_SETUPD',
                        'BR2_PACKAGE_BRCMFMAC_SDIO_FIRMWARE_RPI_WIFI',
                        'BR2_PACKAGE_AVAHI', 'BR2_PACKAGE_DBUS', 'BR2_PACKAGE_OPENRESOLV'):
-            self.assertEqual(speed.values['buildroot'][symbol], 'n')
+            self.assertEqual(without_wifi.values['buildroot'][symbol], 'n')
         for symbol in ('CONFIG_WLAN', 'CONFIG_CFG80211', 'CONFIG_MAC80211', 'CONFIG_BRCMFMAC'):
-            self.assertEqual(speed.values['kernel'][symbol], 'n')
-        self.assertNotIn('etc/modules-load.d/wifi.conf', speed.values['rootfs'])
-        self.assertNotIn('board/rpi4/install-wifi.py', speed.post_build)
+            self.assertEqual(without_wifi.values['kernel'][symbol], 'n')
+        self.assertNotIn('etc/modules-load.d/wifi.conf', without_wifi.values['rootfs'])
+        self.assertNotIn('board/rpi4/install-wifi.py', without_wifi.post_build)
         with self.assertRaisesRegex(UserError, 'wifi.*disabled'):
-            self.plan(requires=[Capability.WIFI])
-
-    def test_dev_includes_wifi_portal_plus_ethernet_and_ssh(self):
-        dev = self.plan('polis-rpi4-dev')
-        wifi = self.plan('polis-rpi4-wifi')
-        for symbol, value in wifi.values['buildroot'].items():
-            if symbol.startswith('BR2_PACKAGE_') and value == 'y':
-                self.assertEqual(dev.values['buildroot'].get(symbol), 'y', symbol)
-        self.assertEqual(dev.values['buildroot']['BR2_PACKAGE_DROPBEAR'], 'y')
-        self.assertEqual(dev.values['kernel']['CONFIG_BCMGENET'], 'y')
-        self.assertEqual(dev.values['buildroot']['BR2_TARGET_GENERIC_HOSTNAME'], 'polis-dev')
+            self.plan(groups=[Group.NO_WIFI], requires=[Capability.WIFI])
 
     def test_group_order_cannot_change_generated_output_or_fingerprint(self):
-        p = self.plan()
+        p = self.plan(groups=WIFI_GROUPS)
         reverse = self.plan(groups=reversed(p.profile.groups))
         self.assertEqual(p.fingerprint, reverse.fingerprint)
         self.assertEqual(p.values, reverse.values)
         self.assertEqual(p.overlays, reverse.overlays)
 
-    def test_development_mode_is_isolated_and_disables_provisioning(self):
+    def test_development_mode_reuses_output_and_disables_provisioning(self):
         final = self.plan()
-        dev = resolver.resolve(self.ctx, 'polis-rpi4-speed', development=True)
+        dev = resolver.resolve(self.ctx, 'fixture-eeprom', development=True)
         self.assertNotEqual(final.fingerprint, dev.fingerprint)
-        self.assertNotEqual(workflow.output_for(self.ctx, final), workflow.output_for(self.ctx, dev))
+        self.assertEqual(workflow.output_for(self.ctx, final), workflow.output_for(self.ctx, dev))
         self.assertEqual(final.values['buildroot']['BR2_PACKAGE_POLIS_FIRSTBOOT'], 'y')
         self.assertNotIn('BR2_PACKAGE_POLIS_FIRSTBOOT', dev.values['buildroot'])
         resolver.write_generated(self.ctx, dev, self.output)
@@ -167,8 +117,26 @@ class ProfileBuildTests(unittest.TestCase):
         self.assertTrue(image['development'])
         self.assertIn('bootloader_update=0', (self.output / 'profile/config.txt').read_text())
         self.configure()
-        with self.assertRaisesRegex(UserError, 'another input set'):
+        with patch.object(workflow, 'run', side_effect=self.fake_configure):
             workflow.configure(self.ctx, dev, self.output, False)
+        workflow.assert_current(self.ctx, dev, self.output)
+        self.assertTrue((self.output / 'profile/reinstall-target').exists())
+
+    def test_image_metadata_never_requests_boot_time_storage_expansion(self):
+        images = self.output / 'images'
+        images.mkdir(parents=True)
+        for development in (False, True):
+            with self.subTest(development=development):
+                plan = resolver.resolve(self.ctx, 'fixture-empty', development=development)
+                resolver.write_generated(self.ctx, plan, self.output)
+                # Exercise metadata generation without building an image.
+                with patch('src.profiles.image.subprocess.run'):
+                    assemble(dict(BASE_DIR=str(self.output), BR2_EXTERNAL_POLIS_PATH=str(REPO),
+                                  BINARIES_DIR=str(images), HOST_DIR=str(self.output / 'host'),
+                                  BUILD_DIR=str(self.output / 'build')))
+                metadata = json.loads((images / 'provisioning.json').read_text())
+                self.assertIs(metadata['expand_data'], False)
+                self.assertEqual(metadata['enabled'], not development)
 
     def test_missing_prerequisite_rejected(self):
         with self.assertRaisesRegex(UserError, 'requires explicitly selected group headless'):
@@ -183,26 +151,33 @@ class ProfileBuildTests(unittest.TestCase):
             return result
         with patch.object(resolver, 'load_group', side_effect=conflicting):
             with self.assertRaisesRegex(UserError, 'conflicting assignments'):
-                self.plan()
+                self.plan(groups=[Group.HEADLESS, Group.KERNEL_SIZE])
 
-    def test_disabling_cutdown_restores_standard_firmware(self):
-        p = self.plan(groups=[g for g in self.plan().profile.groups if g is not Group.CUTDOWN_FIRMWARE])
-        resolver.write_generated(self.ctx, p, self.output)
-        firmware = (self.output / 'profile/config.txt').read_text()
-        self.assertIn('start_file=start4.elf', firmware)
-        self.assertNotIn('gpu_mem=16', firmware)
+    def test_cutdown_selection_controls_generated_firmware(self):
+        for enabled in (True, False):
+            with self.subTest(cutdown=enabled):
+                groups = [Group.HEADLESS]
+                if enabled:
+                    groups.append(Group.CUTDOWN_FIRMWARE)
+                resolver.write_generated(self.ctx, self.plan(groups=groups), self.output)
+                firmware = (self.output / 'profile/config.txt').read_text()
+                self.assertEqual('start_file=start4.elf' in firmware, not enabled)
+                self.assertEqual('gpu_mem=16' in firmware, enabled)
 
-    def test_disabling_premerge_restores_overlay_directives(self):
-        p = self.plan(groups=[g for g in self.plan().profile.groups if g is not Group.PREMERGE_OVERLAYS])
-        resolver.write_generated(self.ctx, p, self.output)
-        firmware = (self.output / 'profile/config.txt').read_text()
-        self.assertIn('dtoverlay=disable-bt', firmware)
-        self.assertIn('dtoverlay=dwc2,dr_mode=peripheral', firmware)
-        self.assertNotIn('BR2_PACKAGE_HOST_POLIS_DTMERGE', p.values['buildroot'])
+    def test_premerge_selection_controls_overlay_directives(self):
+        for enabled in (True, False):
+            with self.subTest(premerge=enabled):
+                groups = [g for g in PREMERGE_GROUPS
+                          if enabled or g is not Group.PREMERGE_OVERLAYS]
+                plan = self.plan(groups=groups)
+                resolver.write_generated(self.ctx, plan, self.output)
+                firmware = (self.output / 'profile/config.txt').read_text()
+                self.assertEqual('dtoverlay=disable-bt' in firmware, not enabled)
+                self.assertEqual('dtoverlay=dwc2,dr_mode=peripheral' in firmware, not enabled)
+                self.assertEqual('BR2_PACKAGE_HOST_POLIS_DTMERGE' in plan.values['buildroot'], enabled)
 
     def test_premerge_without_collector_does_not_select_target_diagnostic_tools(self):
-        p = self.plan(groups=[g for g in self.plan().profile.groups if g is not Group.BOOT_DIAGNOSTICS],
-                      requires=[])
+        p = self.plan(groups=PREMERGE_GROUPS)
         br = resolver.write_generated(self.ctx, p, self.output)
         self.assertEqual(br['BR2_PACKAGE_HOST_POLIS_DTMERGE'], 'y')
         self.assertNotIn('BR2_PACKAGE_BOOT_DIAGNOSTICS_TOOLS', br)
@@ -233,7 +208,7 @@ class ProfileBuildTests(unittest.TestCase):
         self.assertTrue((self.output / 'profile/audit.json').is_file())
         _, staged = self.configure(display=True)
         self.assertIn('Differences from', staged)
-        self.assertIn('gpu_mem', staged)
+        self.assertIn('NET_INSTALL_ENABLED', staged)
         workflow.assert_current(self.ctx, p, self.output)
 
     def test_unchanged_configuration_reuses_files_and_completed_audit(self):
@@ -248,7 +223,7 @@ class ProfileBuildTests(unittest.TestCase):
             run.assert_not_called()
         self.assertEqual(before, {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in paths})
 
-    def test_every_profile_checks_the_shared_lock_before_configuration(self):
+    def test_configuration_checks_the_shared_lock_for_each_selection(self):
         for name in self.ctx.profiles:
             with self.subTest(profile=name), patch.object(inputs, 'verify_inputs',
                     side_effect=UserError('Buildroot inputs differ')), patch.object(workflow, 'run') as run:
@@ -288,7 +263,7 @@ class ProfileBuildTests(unittest.TestCase):
                 patch.object(provision, 'capture_for', return_value=self.root / 'capture'), \
                 patch.object(workflow, 'prepare_eeprom') as prepare, \
                 patch.object(workflow.snapshots, 'snapshot') as snapshot:
-            workflow.execute(self.ctx, 'image', 'polis-rpi4-speed', self.output, 'speed',
+            workflow.execute(self.ctx, 'image', 'fixture-eeprom', self.output, 'speed',
                              capture=self.root / 'capture')
             self.assertFalse(configure.call_args.kwargs['display'])
             build.assert_called_once()
@@ -314,7 +289,7 @@ class ProfileBuildTests(unittest.TestCase):
 
     def test_eeprom_preparation_is_profile_driven(self):
         with patch.object(provision, 'run') as run, contextlib.redirect_stdout(io.StringIO()) as output:
-            provision.prepare(self.ctx, 'polis-rpi4-base')
+            provision.prepare(self.ctx, 'fixture-empty')
             self.assertIn('nothing to do', output.getvalue())
             run.assert_not_called()
 
@@ -358,3 +333,30 @@ class ProfileBuildTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+    def test_all_profiles_modes_and_input_versions_share_default_output(self):
+        first = self.plan()
+        for plan in (first, self.plan('fixture-empty'),
+                     replace(first, development=True), replace(first, fingerprint='b' * 64)):
+            self.assertEqual(workflow.output_for(self.ctx, plan), self.ctx.repo / '.output')
+        self.assertEqual(workflow.output_for(self.ctx, first, self.root / 'override'),
+                         self.root / 'override')
+
+    def test_changed_inputs_keep_compiled_objects_and_repopulate_target(self):
+        plan, _ = self.configure()
+        objects = self.output / 'build/fixture-1'
+        objects.mkdir(parents=True)
+        (objects / 'kept.o').write_bytes(b'compiled')
+        (objects / '.stamp_built').touch()
+        (objects / '.stamp_target_installed').touch()
+        (self.output / 'target/usr/bin').mkdir(parents=True)
+        (self.output / 'target/usr/bin/removed-service').write_text('obsolete')
+        changed = replace(plan, fingerprint='b' * 64)
+        with patch.object(workflow, 'run', side_effect=self.fake_configure):
+            workflow.configure(self.ctx, changed, self.output, False)
+        workflow.assert_current(self.ctx, changed, self.output)
+        workflow.reinstall_target(self.output)
+        self.assertFalse((self.output / 'target').exists())
+        self.assertFalse((objects / '.stamp_target_installed').exists())
+        self.assertEqual((objects / 'kept.o').read_bytes(), b'compiled')
+        self.assertTrue((objects / '.stamp_built').exists())

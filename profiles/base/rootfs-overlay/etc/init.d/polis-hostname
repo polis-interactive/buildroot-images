@@ -1,0 +1,37 @@
+#!/bin/sh
+# polis-hostname-v1: apply /data/config/hostname before network services start.
+set -eu
+export LC_ALL=C
+
+[ -f /data/config/hostname ] || exit 0
+name=$(cat /data/config/hostname)
+case "$name" in
+    ''|*[!a-z0-9-]*|-*|*-)
+        echo 'Invalid /data/config/hostname: use a lowercase DNS label' >&2
+        exit 1 ;;
+esac
+[ "${#name}" -le 63 ] || { echo 'Hostname exceeds 63 characters' >&2; exit 1; }
+
+previous=$(cat /etc/hostname)
+printf '%s\n' "$name" >/run/polis-hostname
+awk -v old="$previous" -v new="$name" '
+    /^[[:space:]]*#/ { print; next }
+    { for (i=2; i<=NF; i++) {
+        if ($i ~ /^#/) break
+        if ($i == old) $i=new
+        else if ($i == old ".local") $i=new ".local"
+      }
+      print
+    }' /etc/hosts >/run/polis-hosts
+mount -o bind /run/polis-hostname /etc/hostname
+mount -o bind /run/polis-hosts /etc/hosts
+hostname -F /etc/hostname
+
+# Development Ethernet supplies an explicit hostname to its DHCP client.
+if [ -f /etc/network/ethernet ]; then
+    awk -v name="$name" '
+        $1 == "hostname" { $2=name }
+        { print }
+    ' /etc/network/ethernet >/run/polis-ethernet
+    mount -o bind /run/polis-ethernet /etc/network/ethernet
+fi

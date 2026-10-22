@@ -24,9 +24,9 @@ def parser() -> argparse.ArgumentParser:
     commands = result.add_subparsers(dest="command")
     commands.add_parser("profiles", help="list available TOML profiles", parents=[common])
     profile_actions = {
-        'configure': 'configure a profile and display its audit',
-        'build': 'build the reviewed profile configuration',
-        'image': 'build and snapshot an image with first-boot EEPROM setup and /data expansion (use --development to skip both)',
+        'configure': 'check/prepare the host kernel logo, configure a profile, and display its audit',
+        'build': 'check/prepare the host kernel logo and build the reviewed profile configuration',
+        'image': 'check/prepare the host kernel logo, build and snapshot an image with first-boot EEPROM setup (use --development to skip); expand /data during host provisioning',
         'audit': 'show the saved profile audit',
         'snapshot': 'snapshot a completed profile build',
     }
@@ -34,11 +34,11 @@ def parser() -> argparse.ArgumentParser:
         command = commands.add_parser(action, parents=[common], help=description)
         command.add_argument('--profile', help='TOML profile name')
         command.add_argument('--output', type=Path,
-                             help='override the profile output directory (default: repository .output/<profile>-<input-hash>/)')
+                             help='override the profile output directory (default: repository .output/)')
         command.add_argument('--ssh-public-key', type=Path,
                              help='development-access public key (default: create/reuse .local/development-ssh/id_ed25519)')
         command.add_argument('--development', action='store_true',
-                             help='use an isolated development build without first-boot EEPROM setup or /data expansion')
+                             help='skip first-boot EEPROM setup; storage is never resized on boot')
         if action == 'image':
             command.add_argument('--capture', type=Path, help='also prepare EEPROM changes using these saved diagnostics')
         if action in ('image', 'snapshot'):
@@ -51,12 +51,16 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument('--bundle-output', type=Path, help='new standalone EEPROM bundle directory')
     for name in ("images", "flash"):
         command = commands.add_parser(name, parents=[common],
-                                      help="list images" if name == "images" else "select and flash an SD-card image")
+                                      help="list images" if name == "images" else "flash an SD-card image (optional --hostname NAME and --ap-name SSID)")
         if name == "images":
             command.add_argument("--output", type=Path, help="additional output directory to search")
         if name == "flash":
             command.add_argument("--image", type=Path)
             command.add_argument("--device", type=Path)
+            command.add_argument("--hostname", metavar="NAME",
+                                 help="set a per-card hostname in /data (requires updated startup scripts; omit .local)")
+            command.add_argument("--ap-name", metavar="SSID",
+                                 help="set the Wi-Fi setup AP name; 1–32 ASCII letters/digits/hyphens/underscores, starting alphanumeric; retains password")
             command.add_argument("--expand-data", action="store_true",
                                  help="grow the final polis-data ext4 partition to fill the card after flashing")
     commands.add_parser("devices", help="list disks and partitions", parents=[common])
@@ -111,7 +115,8 @@ def main(argv=None) -> int:
         elif args.command == "devices":
             images.show_disks(images.disks())
         elif args.command == "flash":
-            images.flash(ctx, args.image, args.device, expand_data=args.expand_data)
+            images.flash(ctx, args.image, args.device, expand_data=args.expand_data,
+                         hostname=args.hostname, ap_name=args.ap_name)
         elif args.command == "smoke":
             name = args.snapshot or choose(snapshots.completed(ctx), "Snapshot")
             if name is None:

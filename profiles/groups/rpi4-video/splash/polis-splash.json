@@ -1,0 +1,14 @@
+{
+  "source_sha256": "2f5afd4c2c57e757939350be8227dae4c275dd2aa0692d7d4ebdeccb4ba884fa",
+  "options": [
+    "-dither",
+    "None",
+    "-colors",
+    "224",
+    "-depth",
+    "8",
+    "-compress",
+    "none"
+  ],
+  "output_sha256": "5b40f3874f110f0eebac1125f31cc789f1dde8f0a8094603a36331ff74f3f1c2"
+}

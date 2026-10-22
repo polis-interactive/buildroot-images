@@ -4,10 +4,10 @@ Build Raspberry Pi 4 images from declarative profiles:
 
 | Profile | Contents |
 | --- | --- |
-| [`polis-rpi4-base`](profiles/polis-rpi4-base.toml) | musl toolchain, read-only EROFS root, writable ext4 data, enforced static core linking |
-| [`polis-rpi4-wifi`](profiles/polis-rpi4-wifi.toml) | Temporary base plus iwd, setup portal and IPv4 mDNS (`polis.local`); no Ethernet or development access |
-| [`polis-rpi4-dev`](profiles/polis-rpi4-dev.toml) | Base plus the Wi-Fi stack, Ethernet DHCP, mDNS (`polis-dev.local`), key-only Dropbear SSH and application uploads; headless |
-| [`polis-rpi4-speed`](profiles/polis-rpi4-speed.toml) | Base plus diagnostics, kernel/firmware optimizations and EEPROM configuration; excludes Wi-Fi and Ethernet |
+| [`polis-rpi4-base`](profiles/polis-rpi4-base.toml) | musl toolchain, read-only EROFS root, writable ext4 data, enforced static core linking, iwd, setup portal and IPv4 mDNS (`polis.local`) |
+| [`polis-rpi4-dev`](profiles/polis-rpi4-dev.toml) | Same core and Wi-Fi stack as base, plus Ethernet DHCP, mDNS (`polis-dev.local`), key-only Dropbear SSH and application uploads; headless |
+| [`polis-rpi4-screen-dev`](profiles/polis-rpi4-screen-dev.toml) | Dev features plus VC4/V3D KMS, TC358743 video/I²S capture, HDMI audio playback, EGL/GLES/GBM, V3DV and diagnostics; [bring-up and Rust guide](docs/screen-development-image.md) |
+| [`polis-rpi4-speed`](profiles/polis-rpi4-speed.toml) | Shared musl/EROFS/static core plus diagnostics, kernel/firmware optimizations and EEPROM configuration; excludes Wi-Fi and Ethernet |
 
 ```sh
 make profiles
@@ -18,8 +18,9 @@ make image ARGS="--profile polis-rpi4-speed --development"
 
 `image` configures, builds, assembles and verifies the SD image, and saves a
 named snapshot. No connected Pi, running daemon, or saved diagnostics are required.
-Final images enable first-boot EEPROM configuration and `/data` expansion by
-default. `--development` skips both in an isolated build. The audit is always saved;
+Final images enable first-boot EEPROM configuration by default.
+`--development` skips it in the same working build directory. Storage is never
+resized on boot; expand `/data` during host provisioning. The audit is always saved;
 the automatic workflow prints its location without displaying all differences.
 No profile is selected implicitly. Omit `--profile` to use the interactive picker.
 
@@ -65,11 +66,17 @@ Ethernet/input/32-bit/container support, local storage, and USB peripheral mode.
 Camera/display use requires a different selection: remove the conflicting
 restrictions and enable the drivers and userspace your product needs.
 
-The base does not select boot-log collection, Wi-Fi, or diagnostic services. Retaining
-a capability does not automatically install its drivers or applications.
+The base image includes the tested Wi-Fi setup integration. It does not select
+boot-log collection, diagnostic services, SSH, or Ethernet DHCP. Base and dev
+require a setup password from `POLIS_WIFI_SETUP_PASSWORD` or
+`.local/wifi-setupd/password` before configuring/building. Profiles compose
+groups over the shared `polis-rpi4-v1` core; they do not inherit the base profile.
 
-Generated files and audits live in `.output/<profile>-<input-hash>/profile/`.
-Different inputs get separate build directories. Staged builds reject changed
+All profiles and modes build in `.output/`; generated files and audits live in
+`.output/profile/`. Input changes reuse that directory and compiled packages.
+On reconfiguration, the next build repopulates `target/` from selected packages
+to remove obsolete packages and overlays without discarding compiled objects.
+Snapshots preserve completed versions; output directories have no hash suffixes. Staged builds reject changed
 inputs or hand-edited generated configuration. Use the same `--output PATH`
 across configure/build/snapshot when overriding the default.
 
@@ -89,8 +96,8 @@ See [the profile and audit contract](docs/build-profiles.md).
 
 ## First-boot setup
 
-Ordinary images expand `/data` to fill the SD card and apply the profile's EEPROM
-settings on the Pi. This works with removable-SD and daemon-controlled flashing;
+Ordinary images apply the profile's EEPROM settings on the Pi. They never
+resize partitions or filesystems on boot. This works with removable-SD and daemon-controlled flashing;
 building requires no Pi, daemon, or saved diagnostics. Use `--development` on
 `image`, or consistently on staged `configure`, `build`, `snapshot`, and `audit`
 commands, to omit setup. The mode is included in the input hash, output directory,
@@ -98,10 +105,11 @@ automatic snapshot name, audit, and `images/provisioning.json`. Switching modes
 with a reused `--output` is rejected. Development firmware also disables bootloader
 self-update; it does not revert previously installed EEPROM settings.
 
-Setup runs after mounting `/data`, before services. Expansion preserves the first
-two partitions and existing files, uses online ext4 resize, and becomes a no-op
-when the card is full. It also works when no EEPROM settings are selected.
-`make flash ARGS="--expand-data"` remains available; setup detects prior expansion.
+Setup runs after mounting `/data`, before services, and handles EEPROM settings
+only. Expand storage during host provisioning, for example with
+`make flash ARGS="--expand-data"`. Without host expansion, `/data` retains the
+size supplied in the image. Old storage-expansion records are ignored and left
+untouched; they never trigger a resize or retry.
 
 EEPROM setup reads the target's configuration and preserves unrelated settings.
 When a change is needed it saves recovery files, stages an update, and reboots
@@ -123,13 +131,13 @@ update files have been inspected. A rollback uses `rollback.bin` as `pieeprom.up
 and `rollback.sig` as `pieeprom.sig` on the boot FAT; its timestamp is newer than
 the staged update. Later EEPROM changes may require regenerating the rollback
 with a newer timestamp. Applying rollback or re-arming setup is a manual operation.
-The original partition table is saved under `/data/provisioning/storage/<card-id>/`.
 
 Provisioning status is separate from normal boot readiness. Diagnostic captures
 include `provisioning.txt`; benchmarks reject setup, verification, failed, or
 missing-status boots. Use a development image for hardware iteration. Final
-images include Python, the pinned Raspberry Pi EEPROM configuration tool,
-`resize2fs`, and `partx`; development images omit these setup dependencies.
+images include Python, the pinned Raspberry Pi EEPROM configuration tool, and
+firmware diagnostics; development mode omits these setup dependencies. First-boot
+setup no longer selects `resize2fs`, `partx`, or their storage-tool packages.
 The daemon allows up to 600 seconds when it observes provisioning over UART;
 expiry stops the workflow without automatically reflashing the card. QEMU smoke
 timing requires a development snapshot.
@@ -216,7 +224,7 @@ commands; `make image help` displays command options. CLI arguments also work as
 | --- | --- |
 | `--buildroot PATH` | `/home/broosegoose/Software/buildroot-2026.08` |
 | `--downloads PATH` | the Buildroot tree's `dl/` directory |
-| `--output PATH` | profile-specific output derived from input hashes |
+| `--output PATH` | `.output/` for every profile and mode |
 | `--snapshots PATH` | this repository's `.snapshots/` directory |
 | `--name NAME` | for image/snapshot: profile plus date, with a unique suffix |
 
@@ -237,7 +245,9 @@ result and includes capture-based EEPROM preparation only when `--capture` is su
 Rule paths are repository-relative unless absolute. Placeholders are `{repo}`,
 `{buildroot}`, `{profile}` and `{output}`. `config` selects symbols with globs,
 `config_paths` tracks files named by config values, and `depends_on` orders rules
-and propagates changes. Add a package manifest when adding a component that
+and propagates changes. Source-extraction rules set `inherit_defaults = false`
+so wrapper, profile and compiler-option changes do not discard source trees.
+Add a package manifest when adding a component that
 needs explicit incremental refresh logic.
 
 Python packages separate responsibilities: `src/profiles` composes and executes
@@ -254,8 +264,9 @@ a compact FAT16 ramdisk inside the boot FAT. Its size is derived from the payloa
 `/` is read-only. `/tmp`, `/run` and `/dev/shm` are volatile. `/data` is mounted
 before normal services; `/data/var-lib` supplies persistent `/var/lib`. Package
 state is seeded once, with retry after interruption. Missing/damaged storage
-blocks services and is never silently formatted. Final images grow `/data` on
-first boot; `--expand-data` during flashing is an optional alternative.
+blocks services and is never silently formatted. No image grows `/data` on
+boot. Use `--expand-data` during host flashing/provisioning when the data
+filesystem should fill the card.
 
 The static policy requires BusyBox and the selected core executables to have no
 ELF interpreter or dynamic dependencies. It covers selected iwd, D-Bus, kmod, XZ,
@@ -265,17 +276,16 @@ fully static linking.
 
 ## Product services and diagnostics
 
-The temporary Wi-Fi profile and dev profile enable iwd, Broadcom Wi-Fi firmware,
+The base and dev profiles enable iwd, Broadcom Wi-Fi firmware,
 Wi-Fi DHCP, openresolv DNS, the setup portal and Avahi. Speed excludes Wi-Fi
-drivers, firmware, iwd, the portal and Avahi. Base remains unchanged until the
-temporary Wi-Fi profile passes hardware acceptance. Wi-Fi images take their
+drivers, firmware, iwd, the portal and Avahi. Wi-Fi images take their
 initial setup password from `POLIS_WIFI_SETUP_PASSWORD`
 or `.local/wifi-setupd/password`; persistent iwd state lives under `/var/lib`. The
 [`polis-wifi-setupd` package](package/polis-wifi-setupd/README.md) adds a portal
 with matching password files preinstalled in the data partition of
-`polis-rpi4-wifi` and dev images.
-It pins release 0.1.3 and its CI-built portal; integrated build and hardware
-acceptance remain to be performed.
+base and dev images.
+It pins release 0.1.3 and its CI-built portal. The promoted base profile still
+needs its own image build and boot verification.
 
 UART0 on GPIO14/TX and GPIO15/RX (header pins 8/10) carries 115200-baud kernel
 logs. Use 3.3 V levels and common ground. Bluetooth routing frees UART0.
@@ -336,6 +346,59 @@ make smoke ARGS="--snapshot my-speed-dev --target init --runs 3"
 Flashing requires explicit device confirmation. Check the disk identity before
 confirming; its contents will be replaced. `--expand-data` grows persistent
 storage after flashing. The flash command does not prepare or apply EEPROM.
+
+For another Pi on the same LAN, choose its hostname while flashing:
+
+```sh
+make flash -- --hostname polis-2
+# Or: make flash ARGS="--hostname polis-2 --expand-data"
+# Set both the LAN hostname and the Wi-Fi setup network name:
+make flash -- --hostname polis-dev-2 --ap-name Polis-Setup-2
+```
+
+`--ap-name` controls the setup AP's SSID independently of the hostname. Use 1–32
+ASCII letters, digits, hyphens or underscores, starting with a letter or digit.
+It updates `/data/wifi-setupd/ssid` and the matching
+`/data/var-lib/iwd/ap/NAME.ap` together, preserving the image's password and AP
+network settings. Unrelated router profiles remain unchanged. An existing
+different profile with the requested name is rejected before writing the card.
+Omitting the option retains the image's AP name (normally `Polis-Setup`).
+AP naming alone works with existing initialized Wi-Fi images, without an image
+or kernel rebuild; images without setup Wi-Fi configuration are rejected.
+
+Use 1–63 lowercase letters, digits or hyphens, starting and ending with a letter
+or digit for `--hostname`; omit `.local`. This writes `/data/config/hostname` on the card and
+leaves the source snapshot unchanged. Startup applies the name before networking,
+including Ethernet DHCP; profiles with Avahi advertise `polis-2.local`.
+No per-device kernel or image build is needed once the image has this support.
+The flash command checks the image's startup scripts and rejects older images
+before writing a card. Regenerate an older image once using the same profile
+and mode, for example:
+
+```sh
+make image ARGS="--profile polis-rpi4-screen-dev --development"
+```
+
+The image is `.output/images/sdcard.img`; successful `make image` also saves and
+prints a snapshot under `.snapshots/`. These startup-script changes do not require
+kernel compilation; the normal incremental build reuses unchanged build inputs.
+Host tools for hostname customization are `sfdisk`, `blkid`, `blockdev`, `debugfs`,
+`e2fsck`, and `dump.erofs` (the latter may come from `.output/host/bin/`). No target
+packages are added. AP-only customization uses the same tools except `dump.erofs`.
+Without `--hostname`, the image's existing hostname is retained.
+
+On a running Pi with the updated startup scripts, change the persistent name
+as root without reflashing:
+
+```sh
+printf '%s\n' polis-2 > /data/config/hostname
+sync
+reboot
+```
+
+For an older image, `hostname polis-2` changes only the running system name; the
+next boot restores the image default. Its read-only `/etc/hostname` cannot be
+edited directly.
 
 Smoke tests boot a disposable copy in QEMU, leaving snapshots unchanged. The
 runner requires the `raspi4b` machine and `fdtput`; use `--qemu`/`--fdtput` to

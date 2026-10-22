@@ -1,0 +1,13 @@
+schema = 1
+id = "rpi4-uart3"
+description = "Pi 4 application UART3 on BCM4 TX / BCM5 RX for the Pico control surface."
+# Official BCM2711 overlay defaults to TX/RX only; no CTS/RTS or RS485.
+firmware_overlays = ["uart3"]
+
+[buildroot]
+"BR2_PACKAGE_RPI_FIRMWARE_INSTALL_DTB_OVERLAYS" = "y"
+"BR2_LINUX_KERNEL_DTB_OVERLAY_SUPPORT" = "y"
+
+[kernel]
+# Already built into bcm2711_defconfig; keep it explicit for slim profiles.
+"CONFIG_SERIAL_AMBA_PL011" = "y"

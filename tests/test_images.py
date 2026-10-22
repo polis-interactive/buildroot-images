@@ -42,6 +42,19 @@ class ExpansionTest(unittest.TestCase):
         self.ctx = Context(self.root, self.root, self.root, self.root)
         self.enterContext(contextlib.redirect_stdout(StringIO()))
 
+    def test_discovery_uses_the_shared_completed_output(self):
+        output = self.root / '.output'
+        (output / 'profile').mkdir(parents=True)
+        (output / 'images').mkdir()
+        image = output / 'images/sdcard.img'
+        image.write_bytes(b'image')
+        audit = output / 'profile/audit.json'
+        with patch.object(images.snapshots, 'completed', return_value=[]):
+            audit.write_text(json.dumps({'profile': 'screen', 'state': 'built'}))
+            self.assertEqual(images.discover_images(self.ctx), [image])
+            audit.write_text(json.dumps({'profile': 'screen', 'state': 'configured'}))
+            self.assertEqual(images.discover_images(self.ctx), [])
+
     def test_flag_defaults_off_and_is_forwarded(self):
         self.assertFalse(cli.parser().parse_args(['flash']).expand_data)
         with patch.object(images, 'flash') as flash:
@@ -153,10 +166,81 @@ class ExpansionTest(unittest.TestCase):
             with self.assertRaisesRegex(UserError, 'Image was written, but /data expansion failed'):
                 images.flash(self.ctx, self.image, self.device, expand_data=True)
 
-    def grow_mocks(self, fsck_status=0, kernel_size=None, fs_size=None, changed_layout=False):
-        sectors = self.disk_size // 512 - 6144
+    def test_hostname_is_written_after_image_and_before_expansion(self):
+        command = self.flash_mocks()
+        prepared = self.root / 'prepared.ext4'
+        def after_hostname(*args):
+            self.assertIn(f'if={prepared}', command.call_args.args[0])
+            self.assertIn('conv=notrunc,fsync', command.call_args.args[0])
+        with patch.object(images.hostname_config, 'prepare', return_value=prepared), \
+                patch.object(images, 'grow_data', side_effect=after_hostname) as grow:
+            images.flash(self.ctx, self.image, self.device, hostname='polis-2', expand_data=True)
+        writes = [call.args[0] for call in command.call_args_list if call.args[0][0] == 'dd']
+        self.assertEqual(len(writes), 2)
+        self.assertIn(f'if={self.image}', writes[0])
+        self.assertIn(f'if={prepared}', writes[1])
+        self.assertIn('seek=6144', writes[1])
+        self.assertIn('conv=notrunc,fsync', writes[1])
+        grow.assert_called_once()
+
+    def test_hostname_compatibility_failure_never_writes(self):
+        command = self.flash_mocks()
+        with patch.object(images.hostname_config, 'prepare', side_effect=UserError('old image')):
+            with self.assertRaisesRegex(UserError, 'old image'):
+                images.flash(self.ctx, self.image, self.device, hostname='polis-2')
+        command.assert_not_called()
+
+    def test_cancel_with_hostname_never_writes(self):
+        command = self.flash_mocks()
+        with patch.object(images.hostname_config, 'prepare', return_value=self.root / 'data.ext4'), \
+                patch('builtins.input', return_value='no'):
+            with self.assertRaisesRegex(UserError, 'Cancelled'):
+                images.flash(self.ctx, self.image, self.device, hostname='polis-2')
+        command.assert_not_called()
+
+    def test_hostname_write_failure_reports_partial_flash(self):
+        command = self.flash_mocks()
+        def write(args, **kwargs):
+            if 'conv=notrunc,fsync' in args:
+                raise OSError('write failed')
+            return subprocess.CompletedProcess(args, 0, '512\n', '')
+        command.side_effect = write
+        with patch.object(images.hostname_config, 'prepare', return_value=self.root / 'data.ext4'):
+            with self.assertRaisesRegex(UserError, 'Image was written, but per-card configuration failed'):
+                images.flash(self.ctx, self.image, self.device, hostname='polis-2')
+
+    def test_ap_only_prepares_and_writes_data(self):
+        command = self.flash_mocks()
+        prepared = self.root / 'prepared.ext4'
+        with patch.object(images.hostname_config, 'prepare', return_value=prepared) as prepare:
+            images.flash(self.ctx, self.image, self.device, ap_name='Polis-Setup-2')
+        self.assertIsNone(prepare.call_args.args[3])
+        self.assertEqual(prepare.call_args.kwargs, dict(ap_name='Polis-Setup-2'))
+        self.assertIn(f'if={prepared}', command.call_args.args[0])
+        self.assertIn('conv=notrunc,fsync', command.call_args.args[0])
+
+    def test_cancel_with_ap_name_never_writes(self):
+        command = self.flash_mocks()
+        with patch.object(images.hostname_config, 'prepare', return_value=self.root / 'data.ext4'), \
+                patch('builtins.input', return_value='no'):
+            with self.assertRaisesRegex(UserError, 'Cancelled'):
+                images.flash(self.ctx, self.image, self.device, ap_name='Polis-Setup-2')
+        command.assert_not_called()
+
+    def test_ap_preflight_failure_never_writes(self):
+        command = self.flash_mocks()
+        with patch.object(images.hostname_config, 'prepare', side_effect=UserError('missing Wi-Fi')):
+            with self.assertRaisesRegex(UserError, 'missing Wi-Fi'):
+                images.flash(self.ctx, self.image, self.device, ap_name='Polis-Setup-2')
+        command.assert_not_called()
+
+    def grow_mocks(self, fsck_status=0, kernel_size=None, fs_size=None, changed_layout=False,
+                   block_size=4096):
+        start = self.source['partitions'][2]['start']
+        sectors = self.disk_size // 512 - start
         before = table(self.device)
         after = table(self.device, sectors)
+        before['partitions'][2]['start'] = after['partitions'][2]['start'] = start
         if changed_layout:
             after['partitions'][1]['start'] += 1
         self.enterContext(patch.object(images, 'data_layout', side_effect=[before, after]))
@@ -170,7 +254,8 @@ class ExpansionTest(unittest.TestCase):
             if '--getsize64' in args:
                 stdout = str(kernel_size if kernel_size is not None else sectors * 512)
             if 'dumpe2fs' in args:
-                stdout = f'Block count: {(fs_size if fs_size is not None else sectors * 512) // 4096}\nBlock size: 4096\n'
+                size = fs_size if fs_size is not None else sectors * 512
+                stdout = f'Block count: {size // block_size}\nBlock size: {block_size}\n'
             return subprocess.CompletedProcess(args, 0, stdout, '')
 
         calls = self.enterContext(patch.object(images, 'run', side_effect=command))
@@ -216,6 +301,35 @@ class ExpansionTest(unittest.TestCase):
         with self.assertRaisesRegex(UserError, 'did not grow'):
             images.grow_data(self.device, self.identity, self.image_size, self.source, [])
 
+    def test_reported_card_size_accepts_page_rounded_1k_filesystem(self):
+        self.disk_size = 15931539456
+        self.identity = (123, 'serial', self.disk_size)
+        self.source['partitions'][2]['start'] = 507905
+        calls, _ = self.grow_mocks(fs_size=15304188 * 1024, block_size=1024)
+        with patch.object(images.os, 'sysconf', return_value=4096):
+            images.grow_data(self.device, self.identity, self.image_size, self.source, [])
+        self.assertEqual(calls.call_args.args[0], ['blockdev', '--flushbufs', self.device])
+
+    def test_page_rounding_uses_host_page_size(self):
+        self.disk_size -= 512
+        self.identity = (123, 'serial', self.disk_size)
+        size = (self.disk_size - 6144 * 512) // 65536 * 65536
+        self.grow_mocks(fs_size=size, block_size=1024)
+        with patch.object(images.os, 'sysconf', return_value=65536):
+            images.grow_data(self.device, self.identity, self.image_size, self.source, [])
+
+    def test_full_page_of_missing_growth_is_rejected(self):
+        size = self.disk_size - 6144 * 512 - 4096
+        self.grow_mocks(fs_size=size, block_size=1024)
+        with patch.object(images.os, 'sysconf', return_value=4096):
+            with self.assertRaisesRegex(UserError, 'did not grow'):
+                images.grow_data(self.device, self.identity, self.image_size, self.source, [])
+
+    def test_filesystem_larger_than_partition_is_rejected(self):
+        self.grow_mocks(fs_size=self.disk_size - 6144 * 512 + 4096)
+        with self.assertRaisesRegex(UserError, 'did not grow'):
+            images.grow_data(self.device, self.identity, self.image_size, self.source, [])
+
     def test_unexpected_table_change_stops_before_fsck(self):
         calls, _ = self.grow_mocks(changed_layout=True)
         with self.assertRaisesRegex(UserError, 'Unexpected partition table'):
@@ -228,6 +342,12 @@ class ExpansionTest(unittest.TestCase):
                      'requires util-linux and e2fsprogs host tools')
 class ExpansionFilesTest(unittest.TestCase):
     def test_real_partition_and_filesystem_growth_preserves_source_and_contents(self):
+        self.check_real_growth(64 << 20)
+
+    def test_real_page_rounded_filesystem_growth_preserves_contents(self):
+        self.check_real_growth((64 << 20) - 512)
+
+    def check_real_growth(self, disk_size):
         with tempfile.TemporaryDirectory(prefix='polis-expand-') as tmp:
             root = Path(tmp)
             source, card, data = [root / name for name in ('source.img', 'card.img', 'data.ext4')]
@@ -236,7 +356,7 @@ class ExpansionFilesTest(unittest.TestCase):
             (seed / 'marker').write_text('keep this application state\n')
             with data.open('wb') as stream:
                 stream.truncate(16 << 20)
-            run(['mkfs.ext4', '-q', '-F', '-L', 'polis-data', '-d', seed, data], capture=True)
+            run(['mkfs.ext4', '-q', '-F', '-b', '1024', '-L', 'polis-data', '-d', seed, data], capture=True)
             with source.open('wb') as stream:
                 stream.truncate(38912 * 512)
             run(['sfdisk', source], input='label: dos\nlabel-id: 0x12345678\n'
@@ -254,7 +374,7 @@ class ExpansionFilesTest(unittest.TestCase):
             images.check_data_filesystem(source, layout['partitions'][2])
             shutil.copyfile(source, card)
             with card.open('r+b') as stream:
-                stream.truncate(64 << 20)
+                stream.truncate(disk_size)
             identity = (123, 'fixture', card.stat().st_size)
 
             def host_command(args, **kwargs):
