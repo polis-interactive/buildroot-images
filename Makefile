@@ -40,7 +40,7 @@ else
 
 $(HELP_GOALS):
 ifeq ($(filter $(COMMANDS) $(SBC_CONTROLLER_COMMANDS),$(MAKECMDGOALS)),)
-	@printf '%s\n' 'Build directory: .output/ for every profile and mode; saved images: .snapshots/.' '' 'Maintenance commands:' \
+	@printf '%s\n' 'Build directory: .output/ for every profile; saved images: .snapshots/.' '' 'Maintenance commands:' \
 		'  make setup        Install Python dependencies, pinned usbboot tools, and RAM recovery payload' \
 		'  make setup-permissions  Install host udev rules and enroll SBC_CONTROLLER_USER via sudo' \
 		'  make test         Run host tests' \
@@ -96,7 +96,7 @@ ifneq ($(strip $(SBC_CONTROLLER_HELP)),)
 		'Select the session with SBC_CONTROLLER_FIXTURE and SBC_CONTROLLER_SOCKET.' \
 		'Diagnostics reads the current boot capture. Benchmark cycles power (default: 5 boots); it never flashes.' \
 		'Requires the running daemon, schema-3 Pico firmware, and rebuilt diagnostic profile for benchmarks.' \
-		'Build hardware-debug images with make image ARGS="--profile polis-rpi4-speed --development" to skip first-boot setup.' \
+		'Build hardware-debug images with make image ARGS="--profile polis-rpi4-speed"; complete first-boot setup before benchmarking.' \
 		'Status reports progress and artifact paths. Never replay a benchmark after an ambiguous reply.'
 else
 	cd package/polis-sbc-controller && $(CARGO) build --locked --target-dir .target -p polis-sbc-controller

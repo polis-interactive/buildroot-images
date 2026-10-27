@@ -11,7 +11,7 @@ fn validate_provisioning(capture: &Value, boot_id: &str) -> Result<()> {
             && provisioning["activity"] == false
             && (provisioning["status"] == "complete" || provisioning["status"] == "disabled")
             && (provisioning["enabled"] == false || provisioning["boot_id"] == boot_id),
-        "provisioning boot or missing provisioning status; finish setup or flash a --development image before benchmarking"
+        "provisioning boot or missing provisioning status; finish setup and verify provisioning status before benchmarking"
     );
     Ok(())
 }

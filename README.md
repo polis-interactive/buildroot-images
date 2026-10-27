@@ -12,14 +12,11 @@ Build Raspberry Pi 4 images from declarative profiles:
 ```sh
 make profiles
 make image ARGS="--profile polis-rpi4-speed"
-# Build-time experiments and hardware debugging: skip first-boot setup.
-make image ARGS="--profile polis-rpi4-speed --development"
 ```
 
 `image` configures, builds, assembles and verifies the SD image, and saves a
 named snapshot. No connected Pi, running daemon, or saved diagnostics are required.
-Final images enable first-boot EEPROM configuration by default.
-`--development` skips it in the same working build directory. Storage is never
+Images enable first-boot EEPROM configuration. Storage is never
 resized on boot; expand `/data` during host provisioning. The audit is always saved;
 the automatic workflow prints its location without displaying all differences.
 No profile is selected implicitly. Omit `--profile` to use the interactive picker.
@@ -72,7 +69,7 @@ require a setup password from `POLIS_WIFI_SETUP_PASSWORD` or
 `.local/wifi-setupd/password` before configuring/building. Profiles compose
 groups over the shared `polis-rpi4-v1` core; they do not inherit the base profile.
 
-All profiles and modes build in `.output/`; generated files and audits live in
+All profiles build in `.output/`; generated files and audits live in
 `.output/profile/`. Input changes reuse that directory and compiled packages.
 On reconfiguration, the next build repopulates `target/` from selected packages
 to remove obsolete packages and overlays without discarding compiled objects.
@@ -98,12 +95,9 @@ See [the profile and audit contract](docs/build-profiles.md).
 
 Ordinary images apply the profile's EEPROM settings on the Pi. They never
 resize partitions or filesystems on boot. This works with removable-SD and daemon-controlled flashing;
-building requires no Pi, daemon, or saved diagnostics. Use `--development` on
-`image`, or consistently on staged `configure`, `build`, `snapshot`, and `audit`
-commands, to omit setup. The mode is included in the input hash, output directory,
-automatic snapshot name, audit, and `images/provisioning.json`. Switching modes
-with a reused `--output` is rejected. Development firmware also disables bootloader
-self-update; it does not revert previously installed EEPROM settings.
+building requires no Pi, daemon, or saved diagnostics. The selected profile
+supplies the EEPROM settings. Setup is recorded in the audit and
+`images/provisioning.json`; all profiles use the same `.output/` build directory.
 
 Setup runs after mounting `/data`, before services, and handles EEPROM settings
 only. Expand storage during host provisioning, for example with
@@ -134,13 +128,14 @@ with a newer timestamp. Applying rollback or re-arming setup is a manual operati
 
 Provisioning status is separate from normal boot readiness. Diagnostic captures
 include `provisioning.txt`; benchmarks reject setup, verification, failed, or
-missing-status boots. Use a development image for hardware iteration. Final
-images include Python, the pinned Raspberry Pi EEPROM configuration tool, and
-firmware diagnostics; development mode omits these setup dependencies. First-boot
+missing-status boots. Finish setup and verify provisioning status before
+benchmarking. Images include Python, the pinned Raspberry Pi EEPROM configuration
+tool, and firmware diagnostics. First-boot
 setup no longer selects `resize2fs`, `partx`, or their storage-tool packages.
 The daemon allows up to 600 seconds when it observes provisioning over UART;
 expiry stops the workflow without automatically reflashing the card. QEMU smoke
-timing requires a development snapshot.
+timing accepts only saved snapshots with first-boot setup disabled; images
+produced by the current CLI are not eligible.
 
 ## Optional capture-based EEPROM preparation
 
@@ -224,7 +219,7 @@ commands; `make image help` displays command options. CLI arguments also work as
 | --- | --- |
 | `--buildroot PATH` | `/home/broosegoose/Software/buildroot-2026.08` |
 | `--downloads PATH` | the Buildroot tree's `dl/` directory |
-| `--output PATH` | `.output/` for every profile and mode |
+| `--output PATH` | `.output/` for every profile |
 | `--snapshots PATH` | this repository's `.snapshots/` directory |
 | `--name NAME` | for image/snapshot: profile plus date, with a unique suffix |
 
@@ -339,8 +334,7 @@ are excluded from selection. Historical snapshots remain usable as evidence.
 make images
 make devices
 make flash ARGS="--image .snapshots/my-speed-image/images/sdcard.img --device /dev/sdX"
-make image ARGS="--profile polis-rpi4-speed --development --name my-speed-dev"
-make smoke ARGS="--snapshot my-speed-dev --target init --runs 3"
+make image ARGS="--profile polis-rpi4-speed --name my-speed-image"
 ```
 
 Flashing requires explicit device confirmation. Check the disk identity before
@@ -376,7 +370,7 @@ before writing a card. Regenerate an older image once using the same profile
 and mode, for example:
 
 ```sh
-make image ARGS="--profile polis-rpi4-screen-dev --development"
+make image ARGS="--profile polis-rpi4-screen-dev"
 ```
 
 The image is `.output/images/sdcard.img`; successful `make image` also saves and

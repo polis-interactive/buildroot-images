@@ -25,8 +25,8 @@ pub const RECOVERY_ENABLED: bool = true;
 // Provisioning UART update + repeated green LED confirmed 2026-10-09.
 pub const OTP_GPIO8_PROVISIONED: bool = true;
 // Hardware-observed ROM and RAM recovery gadget on this dedicated USB port.
-pub const PI_USB_PATH: &str = "3-2";
-pub const SD_DISK_ID_PATH: &str = "pci-0000:00:14.0-usb-0:2:1.0-scsi-0:0:0:0";
+pub const PI_USB_PATH: &str = "3-4";
+pub const SD_DISK_ID_PATH: &str = "pci-0000:00:14.0-usb-0:4:1.0-scsi-0:0:0:0";
 pub const SD_DISK_SERIAL: &str = "1000000000e4bb49";
 // Official usbboot commit 861a703d8b51f42b76bcdff49da3e0f2766966bf.
 // Paths are relative to the repository, resolved below before use.

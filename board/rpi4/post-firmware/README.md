@@ -2,7 +2,7 @@
 
 This guide covers the optional capture-based host workflow. Final profile images
 also support [default-on first-boot setup](../../../README.md#first-boot-setup),
-which reads the live board configuration. Use `--development` to omit that setup.
+which reads the live board configuration.
 
 The profile's `[eeprom]` assignments determine preparation. `make image` runs
 this stage only when `--capture DIRECTORY` is supplied, after assembling the

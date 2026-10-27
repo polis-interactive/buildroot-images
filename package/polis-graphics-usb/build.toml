@@ -1,7 +1,0 @@
-[[steps]]
-name = "graphics-usb"
-when = "BR2_PACKAGE_POLIS_GRAPHICS_USB"
-targets = ["polis-graphics-usb-dirclean", "polis-graphics-usb"]
-inputs = ["package/polis-graphics-usb", ".local/graphics-usb"]
-config = ["BR2_PACKAGE_POLIS_GRAPHICS_USB", "BR2_ROOTFS_DEVICE_CREATION*", "BR2_INIT_*"]
-outputs = ["{output}/target/usr/sbin/polis-graphics-usb", "{output}/target/usr/bin/hdmi-graphics-hello", "{output}/target/usr/share/polis-graphics-usb", "{output}/target/etc/init.d/S09polis-graphics-usb"]

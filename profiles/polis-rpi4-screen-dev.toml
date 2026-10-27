@@ -2,6 +2,6 @@
 schema = 1
 name = "polis-rpi4-screen-dev"
 base = "polis-rpi4-v1"
-# Controls use UART3; graphics lookups use the USB-A host ports.
+# Production controls and artwork share USB; UART3 remains for legacy hardware.
 requires = ["wifi", "wifi-setup-portal", "ethernet", "development-ssh", "display", "camera", "usb-host"]
-groups = ["wifi-iwd", "wifi-setupd", "development-access", "rpi4-video", "rpi4-uart3", "ffmpeg-libraries", "rpi4-usb-host", "screen-graphics-usb"]
+groups = ["wifi-iwd", "wifi-setupd", "development-access", "rpi4-video", "rpi4-uart3", "ffmpeg-libraries", "rpi4-usb-host", "polis-splash-screen"]

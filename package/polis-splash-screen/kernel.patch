@@ -1,0 +1,66 @@
+--- a/drivers/gpu/drm/vc4/Makefile
++++ b/drivers/gpu/drm/vc4/Makefile
+@@ -37,3 +37,5 @@
+ vc4-$(CONFIG_DEBUG_FS) += vc4_debugfs.o
+ 
+ obj-$(CONFIG_DRM_VC4)  += vc4.o
++
++obj-$(CONFIG_DRM_POLIS_SPLASH_SCREEN) += polis-splash-screen/
+--- a/drivers/gpu/drm/vc4/Kconfig
++++ b/drivers/gpu/drm/vc4/Kconfig
+@@ -51,3 +51,11 @@
+ 	  Documentation/dev-tools/kunit/.
+ 
+ 	  If in doubt, say "N".
++
++config DRM_POLIS_SPLASH_SCREEN
++	bool "Polis persistent development splash"
++	depends on RUST && DRM_VC4=y && ARM64
++	depends on !DRM_FBDEV_EMULATION
++	help
++	  A built-in Rust DRM client that draws the Polis logo on hotplug and
++	  restores it on DRM lastclose. No fbdev or virtual terminal required.
+--- a/drivers/gpu/drm/vc4/vc4_drv.c
++++ b/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -35,6 +35,10 @@
+ #include <drm/drm_atomic_helper.h>
+ #include <drm/drm_drv.h>
+ #include <drm/drm_fbdev_dma.h>
++
++#if IS_ENABLED(CONFIG_DRM_POLIS_SPLASH_SCREEN)
++int polis_splash_screen_setup(struct drm_device *dev);
++#endif
+ #include <drm/drm_vblank.h>
+ 
+ #include <soc/bcm2835/raspberrypi-firmware.h>
+@@ -428,7 +432,13 @@
+ 	if (ret < 0)
+ 		goto err;
+ 
++#if IS_ENABLED(CONFIG_DRM_POLIS_SPLASH_SCREEN)
++	ret = polis_splash_screen_setup(drm);
++	if (ret)
++		drm_warn(drm, "polis-splash-screen registration failed: %d\n", ret);
++#else
+ 	drm_fbdev_dma_setup(drm, 16);
++#endif
+ 
+ 	return 0;
+ 
+--- a/rust/bindings/bindings_helper.h
++++ b/rust/bindings/bindings_helper.h
+@@ -5,6 +5,14 @@
+  *
+  * Sorted alphabetically.
+  */
++
++#ifdef CONFIG_DRM_POLIS_SPLASH_SCREEN
++#include <drm/drm_auth.h>
++#include <drm/drm_client.h>
++#include <drm/drm_framebuffer.h>
++/* Internal master arbitration is private to this pinned DRM implementation. */
++#include "../../drivers/gpu/drm/drm_internal.h"
++#endif
+ 
+ #include <kunit/test.h>
+ #include <linux/blk-mq.h>

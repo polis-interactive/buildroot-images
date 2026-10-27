@@ -3,7 +3,14 @@ source "$BR2_EXTERNAL_POLIS_PATH/package/polis-firstboot/Config.in"
 source "$BR2_EXTERNAL_POLIS_PATH/package/polis-wifi-setupd/Config.in"
 source "$BR2_EXTERNAL_POLIS_PATH/package/polis-dtmerge/Config.in.host"
 source "$BR2_EXTERNAL_POLIS_PATH/package/polis-dtoverlay/Config.in"
-source "$BR2_EXTERNAL_POLIS_PATH/package/polis-graphics-usb/Config.in"
+
+config BR2_POLIS_RPI4_VL805_FIRMWARE
+	bool "Use Pi 4 boot firmware with the VL805 decompressor fix"
+	depends on BR2_PACKAGE_RPI_FIRMWARE_VARIANT_PI4
+	help
+	  Replace start4.elf and fixup4.dat with the pinned upstream fix for
+	  VL805 initialization when the bootloader has not initialized USB.
+	  Keep the existing kernel, DTBs and overlays. No EEPROM update.
 
 config BR2_POLIS_KERNEL_LOGO
 	bool "Embed the preconverted Polis kernel logo"
@@ -28,3 +35,11 @@ config BR2_POLIS_PREFER_STATIC
 	  Link the core boot executables statically while retaining
 	  shared-library support for packages such as BlueZ. Requires
 	  the Polis musl board's patches and BusyBox config fragment.
+
+config BR2_POLIS_SPLASH_SCREEN
+	bool "Polis persistent Rust DRM splash"
+	depends on BR2_LINUX_KERNEL && BR2_aarch64
+	help
+	  Build the private Rust DRM client into VC4 for screen development.
+	  Needs host rustc, matching rust-src, bindgen and libclang; adds no
+	  userspace runtime dependencies. The profile disables fbdev/fbcon.

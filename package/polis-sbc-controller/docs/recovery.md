@@ -374,3 +374,20 @@ were updated. RAM loading, full image write/readback verification, and normal
 boot subsequently passed. The current SD ID_PATH is
 `pci-0000:00:14.0-usb-0:2:1.0-scsi-0:0:0:0`.
 See [the five-boot benchmark record](benchmark.md#bench-qualification--2026-10-09).
+
+### USB port mapping update — 2026-10-22
+
+After repairing torn Pi-side USB data wiring, the same ROM serial `00e4bb49`
+enumerated on port `3-4`. The previous `3-2` mapping now identifies a host USB
+hub, so its pinned-port check correctly timed out. Fixture constants were
+updated to `3-4` and SD ID_PATH
+`pci-0000:00:14.0-usb-0:4:1.0-scsi-0:0:0:0`; the host daemon was rebuilt and
+restarted. RAM-only recovery run `1792693632387-c7f866ca1c1f03ee` passed, and
+the exported SD serial `1000000000e4bb49`, capacity 15,931,539,456 bytes,
+and unmounted state were verified. Existing device permissions worked.
+
+The recovery SD export was used to back up and patch only its boot firmware
+pair, with direct readback, for the
+[VL805 timeout fix](../../../docs/screen-development-image.md#firmware-fix-hardware-test--2026-10-22).
+Two subsequent normal boots initialized xHCI successfully. No OTP or EEPROM
+operation was performed.

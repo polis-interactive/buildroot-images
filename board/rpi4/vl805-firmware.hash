@@ -1,0 +1,4 @@
+# SHA-256 of the official raspberrypi/firmware boot files at
+# 0e05e17767d62a60cc2fafaafbdc42aaead3984b (VL805 decompressor fix).
+sha256  5f476b2c738aae0bad36762ae45e066e704cd523dea6a9562930ff224a4da02e  start4.elf
+sha256  7dd8edd556393c36814a3210296b6a10011b0e5504273c291372a91e880234db  fixup4.dat

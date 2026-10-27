@@ -196,20 +196,17 @@ The implemented boundaries are:
 | --- | --- |
 | Base groups | Musl toolchain, EROFS/read-only storage layout, static core policy |
 | Product features | Application/runtime services, Wi-Fi, boot diagnostics, UART/USB diagnostics, benchmark instrumentation |
-| `rpi4-uart3` | Official BCM2711 UART3 overlay on BCM4/5 for the Pico control surface; application-owned serial port, no console or getty. See [wiring and tests](screen-development-image.md#pico-control-surface-on-uart3). |
+| `rpi4-uart3` | Official BCM2711 UART3 overlay on BCM4/5 for legacy Pico controller tests; application-owned serial port, no console or getty. Production controls, HDMI facts and artwork share USB. See [wiring and tests](screen-development-image.md#pico-control-surface-on-uart3). |
 | `ffmpeg-libraries` | Upstream FFmpeg 6.1.5 libraries and staging development files for software H.264/AAC/MP3/AC3 decoding, MP4 file input and resampling. Selected only by `polis-rpi4-screen-dev`; no FFmpeg CLI programs or new external target dependencies. See [SDK integration](screen-development-image.md#ffmpeg-libraries-and-sdk-integration). |
-| `rpi4-usb-host` | Pi 4 USB-A VL805/xHCI and built-in CDC ACM with firmware-reset prerequisites; excludes gadget diagnostics and unrelated USB peripheral drivers. |
-| `screen-graphics-usb` | Existing BusyBox mdev events start one supervised `hdmi-graphics-hello` per matching Pico. Requires a prepared app payload; see [graphics USB](screen-development-image.md#graphics-usb-on-the-usb-a-host-ports). |
+| `rpi4-usb-host` | Pi 4 USB-A VL805/xHCI and built-in CDC ACM with firmware-reset prerequisites and normal mdev device-node creation. `hdmi-passthru` owns the production controller connection; excludes gadget diagnostics and unrelated USB peripheral drivers. See [controller USB](screen-development-image.md#controller-usb-on-the-usb-a-host-ports). |
 | Capability restrictions | Headless configuration, no Ethernet, UART/Bluetooth routing, USB peripheral-only operation, no input, no 32-bit compatibility/containers/alternate storage |
 | Independent optimizations | Compiler size optimization, debug instrumentation trimming, no cron, HAT/PoE probe skips, LZ4 kernel, premerged overlays, boot ramdisk |
-| Board provisioning | First-boot EEPROM configuration enabled by default; `--development` disables it. Storage is never resized on boot; expand `/data` during host provisioning. Capture-based `prepare-eeprom` / `image --capture` remain optional. |
+| Board provisioning | First-boot EEPROM configuration is enabled for profile builds. Storage is never resized on boot; expand `/data` during host provisioning. Capture-based `prepare-eeprom` / `image --capture` remain optional. |
 
 Use descriptive identifiers; experiment IDs remain only as evidence references.
-The CLI's `--development` mode is an input to the build fingerprint, applies to
-staged configure/build/snapshot/audit as well as image. Both modes share
-`.output/`; reconfiguration switches the active selection in place.
-The target configuration and `images/provisioning.json` declare the mode;
-automatic snapshots include `final` or `development` in their name.
+All profile commands use `.output/`; reconfiguration switches the active
+profile in place. The target configuration and `images/provisioning.json`
+declare first-boot setup; automatic snapshots use `profile-final-YYYYMMDD` names.
 First-boot status is captured separately from readiness and excluded from normal
 benchmark samples. See [setup and recovery details](../README.md#first-boot-setup).
 A measured bundle gain does not establish individual gains after splitting it

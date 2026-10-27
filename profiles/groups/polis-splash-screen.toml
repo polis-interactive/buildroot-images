@@ -1,0 +1,25 @@
+schema = 1
+id = "polis-splash-screen"
+description = "Persistent Rust DRM splash with hotplug and automatic application handoff; no fbdev."
+requires = ["rpi4-video", "development-access"]
+inputs = ["package/polis-splash-screen", "profiles/groups/rpi4-video/splash/polis-splash.ppm"]
+remove_cmdline = ["fbcon", "vt.global_cursor_default", "consoleblank"]
+
+[buildroot]
+"BR2_POLIS_SPLASH_SCREEN" = "y"
+"BR2_POLIS_KERNEL_LOGO" = "n"
+
+[kernel]
+"CONFIG_RUST" = "y"
+# The pinned 6.12 Rust implementation cannot be combined with MODVERSIONS.
+"CONFIG_MODVERSIONS" = "n"
+"CONFIG_DRM_POLIS_SPLASH_SCREEN" = "y"
+"CONFIG_DRM_FBDEV_EMULATION" = "n"
+"CONFIG_FB" = "n"
+"CONFIG_FB_CORE" = "n"
+"CONFIG_FRAMEBUFFER_CONSOLE" = "n"
+"CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER" = "n"
+"CONFIG_LOGO" = "n"
+"CONFIG_LOGO_LINUX_CLUT224" = "n"
+"CONFIG_VT" = "n"
+"CONFIG_VT_CONSOLE" = "n"

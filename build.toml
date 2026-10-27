@@ -18,8 +18,8 @@ name = "kernel-source"
 inherit_defaults = false
 when = "BR2_LINUX_KERNEL"
 targets = ["linux-dirclean"]
-inputs = ["{buildroot}/linux", "{buildroot}/board/raspberrypi/patches/linux", "patches/*/linux"]
-config = ["BR2_LINUX_KERNEL_VERSION", "BR2_LINUX_KERNEL_CUSTOM_VERSION*", "BR2_LINUX_KERNEL_CUSTOM_TARBALL*", "BR2_LINUX_KERNEL_CUSTOM_GIT*", "BR2_LINUX_KERNEL_CUSTOM_HG*", "BR2_LINUX_KERNEL_CUSTOM_SVN*", "BR2_GLOBAL_PATCH_DIR"]
+inputs = ["{buildroot}/linux", "{buildroot}/board/raspberrypi/patches/linux", "patches/*/linux", "package/polis-splash-screen/kernel.patch", "package/polis-splash-screen/polis-splash-screen.mk"]
+config = ["BR2_LINUX_KERNEL_VERSION", "BR2_LINUX_KERNEL_CUSTOM_VERSION*", "BR2_LINUX_KERNEL_CUSTOM_TARBALL*", "BR2_LINUX_KERNEL_CUSTOM_GIT*", "BR2_LINUX_KERNEL_CUSTOM_HG*", "BR2_LINUX_KERNEL_CUSTOM_SVN*", "BR2_GLOBAL_PATCH_DIR", "BR2_POLIS_SPLASH_SCREEN"]
 config_paths = ["BR2_LINUX_KERNEL_PATCH"]
 # Recorded after the dependent kernel rule has extracted/patched/built it.
 outputs = ["{output}/build/linux-*/.stamp_patched"]
@@ -29,8 +29,8 @@ name = "kernel"
 when = "BR2_LINUX_KERNEL"
 depends_on = ["kernel-source"]
 targets = ["linux-reconfigure"]
-inputs = ["{buildroot}/linux", "board/rpi4/kernel-entry.patch", "board/rpi4/install-kernel-entry.py", "board/rpi4/kernel-entry.mk", "board/rpi4/kernel-logo.mk", "profiles/groups/rpi4-video/splash/polis-splash.ppm"]
-config = ["BR2_LINUX_KERNEL*", "BR2_POLIS_KERNEL_LOGO"]
+inputs = ["{buildroot}/linux", "board/rpi4/kernel-entry.patch", "board/rpi4/install-kernel-entry.py", "board/rpi4/kernel-entry.mk", "board/rpi4/kernel-logo.mk", "profiles/groups/rpi4-video/splash/polis-splash.ppm", "package/polis-splash-screen/src", "package/polis-splash-screen/prepare.rs"]
+config = ["BR2_LINUX_KERNEL*", "BR2_POLIS_KERNEL_LOGO", "BR2_POLIS_SPLASH_SCREEN"]
 config_paths = ["BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE", "BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES", "BR2_LINUX_KERNEL_CUSTOM_DTS_PATH", "BR2_LINUX_KERNEL_CUSTOM_DTS_DIR", "BR2_LINUX_KERNEL_CUSTOM_LOGO_PATH"]
 outputs = ["{output}/build/linux-*/.stamp_built", "{output}/build/linux-*/.config", "{output}/images/Image"]
 
@@ -58,8 +58,8 @@ name = "firmware-source"
 inherit_defaults = false
 when = "BR2_PACKAGE_RPI_FIRMWARE"
 targets = ["rpi-firmware-dirclean"]
-inputs = ["{buildroot}/package/rpi-firmware", "patches/*/rpi-firmware"]
-config = ["BR2_GLOBAL_PATCH_DIR"]
+inputs = ["{buildroot}/package/rpi-firmware", "patches/*/rpi-firmware", "board/rpi4/vl805-firmware.mk", "board/rpi4/vl805-firmware.hash"]
+config = ["BR2_GLOBAL_PATCH_DIR", "BR2_POLIS_RPI4_VL805_FIRMWARE"]
 outputs = ["{output}/build/rpi-firmware-*/.stamp_patched"]
 
 [[steps]]
@@ -68,6 +68,6 @@ when = "BR2_PACKAGE_RPI_FIRMWARE"
 depends_on = ["firmware-source"]
 targets = ["rpi-firmware-reinstall"]
 inputs = ["{buildroot}/package/rpi-firmware"]
-config = ["BR2_PACKAGE_RPI_FIRMWARE*"]
+config = ["BR2_PACKAGE_RPI_FIRMWARE*", "BR2_POLIS_RPI4_VL805_FIRMWARE"]
 config_paths = ["BR2_PACKAGE_RPI_FIRMWARE_CONFIG_FILE", "BR2_PACKAGE_RPI_FIRMWARE_CMDLINE_FILE", "BR2_PACKAGE_RPI_FIRMWARE_EXTRA_FILES"]
 outputs = ["{output}/images/rpi-firmware"]

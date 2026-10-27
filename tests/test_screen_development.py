@@ -33,7 +33,7 @@ class ScreenDevelopmentTests(unittest.TestCase):
         self.assertEqual(set(screen.profile.groups),
                          set(dev.profile.groups) - {Group.HEADLESS}
                          | {Group.RPI4_VIDEO, Group.RPI4_UART3, Group.FFMPEG_LIBRARIES,
-                            Group.RPI4_USB_HOST, Group.SCREEN_GRAPHICS_USB})
+                            Group.RPI4_USB_HOST, Group.POLIS_SPLASH_SCREEN})
         self.assertTrue(set(dev.profile.requires) <= set(screen.profile.requires))
         for group in (Group.WIFI_IWD, Group.WIFI_SETUPD, Group.DEVELOPMENT_ACCESS):
             for domain in ('buildroot', 'kernel', 'busybox'):
@@ -57,19 +57,42 @@ class ScreenDevelopmentTests(unittest.TestCase):
 
     def test_screen_enables_host_usb_without_changing_other_profiles(self):
         screen = resolver.resolve(self.ctx, 'polis-rpi4-screen-dev', development=True)
+        self.assertEqual(screen.values['buildroot']['BR2_POLIS_RPI4_VL805_FIRMWARE'], 'y')
+        self.assertNotIn('BR2_PACKAGE_POLIS_GRAPHICS_USB', screen.values['buildroot'])
+        self.assertEqual(screen.values['buildroot']['BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_MDEV'], 'y')
+        for symbol in ('CONFIG_MDEV', 'CONFIG_FEATURE_MDEV_CONF',
+                       'CONFIG_FEATURE_MDEV_EXEC', 'CONFIG_FEATURE_MDEV_DAEMON'):
+            self.assertEqual(screen.values['busybox'][symbol], 'y')
+        for symbol in ('CONFIG_USB', 'CONFIG_USB_XHCI_HCD', 'CONFIG_USB_XHCI_PCI',
+                       'CONFIG_USB_ACM', 'CONFIG_DEVTMPFS', 'CONFIG_DEVTMPFS_MOUNT'):
+            self.assertEqual(screen.values['kernel'][symbol], 'y')
         host = screen.groups[Group.RPI4_USB_HOST]['kernel']
         for symbol, expected in host.items():
             self.assertEqual(screen.values['kernel'][symbol], expected)
         for name in ('polis-rpi4-dev', 'polis-rpi4-speed'):
             plan = resolver.resolve(self.ctx, name, development=True)
             self.assertNotIn(Group.RPI4_USB_HOST, plan.groups)
-            self.assertNotIn(Group.SCREEN_GRAPHICS_USB, plan.groups)
+            self.assertNotEqual(plan.values['buildroot'].get('BR2_POLIS_RPI4_VL805_FIRMWARE'), 'y')
             self.assertNotEqual(plan.values['kernel'].get('CONFIG_USB_SUPPORT'), 'n')
         for symbol in ('CONFIG_BCMGENET', 'CONFIG_BRCMFMAC_SDIO',
                        'CONFIG_DRM_VC4', 'CONFIG_I2C_BRCMSTB',
                        'CONFIG_VIDEO_BCM2835_UNICAM_LEGACY', 'CONFIG_VIDEO_TC358743',
                        'CONFIG_SND_BCM2835_SOC_I2S'):
             self.assertEqual(screen.values['kernel'][symbol], 'y')
+
+    def test_retirement_hook_survives_switching_to_any_profile(self):
+        hook = resolver.REPO_PATH + 'board/rpi4/install-controller-usb.py'
+        for name in self.ctx.profiles:
+            for development in (True, False):
+                with self.subTest(profile=name, development=development):
+                    plan = resolver.resolve(self.ctx, name, development=development)
+                    hooks = plan.values['buildroot']['BR2_ROOTFS_POST_BUILD_SCRIPT'].split()
+                    self.assertEqual(hooks.count(hook), 1)
+                    self.assertNotIn('BR2_PACKAGE_POLIS_GRAPHICS_USB', plan.values['buildroot'])
+                    self.assertFalse(any('package/polis-graphics-usb/' in path for path in hooks))
+                    self.assertFalse(any('.local/graphics-usb' in path
+                                         for group in plan.groups.values()
+                                         for path in group.get('inputs', [])))
 
     def test_ffmpeg_is_library_only_and_audited(self):
         plan = resolver.resolve(self.ctx, 'polis-rpi4-screen-dev', development=True)
@@ -140,12 +163,13 @@ class ScreenDevelopmentTests(unittest.TestCase):
         cmdline = (output / 'profile/cmdline.txt').read_text().split()
         self.assertEqual([arg for arg in cmdline if arg.startswith('console=')],
                          ['console=ttyAMA0,115200'])
-        self.assertIn('fbcon=nodefer,logo-pos:center,logo-count:1', cmdline)
-        self.assertIn('vt.global_cursor_default=0', cmdline)
-        self.assertIn('consoleblank=0', cmdline)
+        self.assertFalse(any(arg.startswith('fbcon=') for arg in cmdline))
+        self.assertNotIn('vt.global_cursor_default=0', cmdline)
+        self.assertNotIn('consoleblank=0', cmdline)
         self.assertNotIn('quiet', cmdline)
         self.assertFalse(any(arg.startswith('loglevel=') for arg in cmdline))
-        self.assertEqual(requested['BR2_POLIS_KERNEL_LOGO'], 'y')
+        self.assertEqual(requested['BR2_POLIS_KERNEL_LOGO'], 'n')
+        self.assertEqual(requested['BR2_POLIS_SPLASH_SCREEN'], 'y')
         self.assertFalse(requested.get('BR2_LINUX_KERNEL_CUSTOM_LOGO_PATH'))
         payloads = [payload['path'] for change in plan.changes
                     for payload in change.get('payloads', [])]
@@ -169,8 +193,9 @@ class ScreenDevelopmentTests(unittest.TestCase):
                     workflow.check_values(requested, dict(requested, **{key: 'n'}),
                                           'Buildroot', REPO, output)
         kernel = plan.values['kernel']
-        for key in ('CONFIG_FB_SIMPLE', 'CONFIG_FB_BCM2708', 'CONFIG_FB_SSD1307',
-                    'CONFIG_FB_RPISENSE', 'CONFIG_FB_TFT',
+        for key in ('CONFIG_FB', 'CONFIG_FB_CORE', 'CONFIG_DRM_FBDEV_EMULATION',
+                    'CONFIG_FRAMEBUFFER_CONSOLE', 'CONFIG_LOGO', 'CONFIG_LOGO_LINUX_CLUT224',
+                    'CONFIG_VT', 'CONFIG_VT_CONSOLE', 'CONFIG_MODVERSIONS',
                     'CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER',
                     'CONFIG_USB_GADGET',
                     'CONFIG_USB_DWCOTG', 'CONFIG_USB_DWC2'):
@@ -182,9 +207,7 @@ class ScreenDevelopmentTests(unittest.TestCase):
         for key in ('CONFIG_USB_SUPPORT', 'CONFIG_USB', 'CONFIG_USB_ACM',
                     'CONFIG_USB_XHCI_HCD', 'CONFIG_USB_XHCI_PCI',
                     'CONFIG_PCIE_BRCMSTB', 'CONFIG_RESET_RASPBERRYPI',
-                    'CONFIG_FB', 'CONFIG_FB_CORE', 'CONFIG_DRM_FBDEV_EMULATION',
-                    'CONFIG_FRAMEBUFFER_CONSOLE', 'CONFIG_LOGO', 'CONFIG_LOGO_LINUX_CLUT224',
-                    'CONFIG_VT', 'CONFIG_VT_CONSOLE', 'CONFIG_DRM_SIMPLEDRM',
+                    'CONFIG_RUST', 'CONFIG_DRM_POLIS_SPLASH_SCREEN', 'CONFIG_DRM_SIMPLEDRM',
                     'CONFIG_DRM_VC4', 'CONFIG_DRM_V3D',
                     'CONFIG_VIDEO_BCM2835_UNICAM_LEGACY', 'CONFIG_VIDEO_TC358743',
                     'CONFIG_MEDIA_CONTROLLER', 'CONFIG_VIDEO_V4L2_SUBDEV_API',
@@ -198,6 +221,17 @@ class ScreenDevelopmentTests(unittest.TestCase):
                 with self.assertRaisesRegex(UserError, key):
                     workflow.check_values(kernel, dict(kernel, **{key: 'n'}),
                                           'kernel', REPO, output)
+
+    def test_splash_is_scoped_to_screen_and_adds_no_userspace_dependency(self):
+        screen = resolver.resolve(self.ctx, 'polis-rpi4-screen-dev', development=True)
+        self.assertEqual(set(screen.groups[Group.POLIS_SPLASH_SCREEN]['buildroot']),
+                         {'BR2_POLIS_SPLASH_SCREEN', 'BR2_POLIS_KERNEL_LOGO'})
+        for name in self.ctx.profiles:
+            if name == 'polis-rpi4-screen-dev':
+                continue
+            plan = resolver.resolve(self.ctx, name, development=True)
+            self.assertNotIn(Group.POLIS_SPLASH_SCREEN, plan.groups)
+            self.assertNotEqual(plan.values['buildroot'].get('BR2_POLIS_SPLASH_SCREEN'), 'y')
 
     def test_kernel_logo_is_the_supplied_512_pixel_icon(self):
         import struct

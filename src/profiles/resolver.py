@@ -339,7 +339,10 @@ def compose_buildroot(plan):
         owners.append(Group.HEADLESS.value)
     if owners:
         assign('BR2_ROOTFS_POST_BUILD_SCRIPT', ' '.join(hooks), owners, 'base-to-profile')
+    # All profiles share the output tree. Retire old USB workers even when
+    # switching away from the screen profile, before rootfs image generation.
     assign('BR2_ROOTFS_POST_BUILD_SCRIPT', values['BR2_ROOTFS_POST_BUILD_SCRIPT'] +
+           ' ' + REPO_PATH + 'board/rpi4/install-controller-usb.py' +
            ' ' + REPO_PATH + 'package/polis-firstboot/install.py', ['erofs-root'])
     if not plan.development:
         assign('BR2_PACKAGE_POLIS_FIRSTBOOT', 'y', ['erofs-root'])

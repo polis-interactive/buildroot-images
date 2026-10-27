@@ -9,7 +9,7 @@ config BR2_PACKAGE_POLIS_FIRSTBOOT
 	select BR2_PACKAGE_BOOT_DIAGNOSTICS_TOOLS
 	help
 	  Once-only Pi 4 EEPROM configuration. Never resizes storage.
-	  Profile builds enable this by default; --development disables
-	  it. Uses same-release EEPROM firmware, persistent recovery
+	  Profile builds enable this by default.
+	  Uses same-release EEPROM firmware, persistent recovery
 	  records, and at most one automatic EEPROM update attempt per
 	  settings set.

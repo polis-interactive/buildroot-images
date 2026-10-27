@@ -32,7 +32,7 @@ class SmokeTest(unittest.TestCase):
         images = self.root / 'images'
         images.mkdir()
         (images / 'provisioning.json').write_text(json.dumps(dict(scope='first-boot', enabled=True)))
-        with self.assertRaisesRegex(UserError, '--development'):
+        with self.assertRaisesRegex(UserError, 'first-boot EEPROM setup is enabled'):
             smoke.boot_inputs(self.root)
 
     def test_split_marker_and_guest_uptime(self):

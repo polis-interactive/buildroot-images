@@ -78,7 +78,7 @@ def boot_inputs(source: Path, expect: str = "POLIS_SMOKE_READY init") -> tuple[l
     if provisioning.is_file():
         policy = json.loads(provisioning.read_text())
         if policy.get('scope') == 'first-boot' and policy.get('enabled'):
-            raise UserError('Smoke timing requires a --development image; first-boot setup is enabled in this snapshot.')
+            raise UserError('QEMU smoke timing cannot run this snapshot: first-boot EEPROM setup is enabled.')
     files = [images / name for name in ("sdcard.img", "Image", "bcm2711-rpi-4-b.dtb")]
     cmdline = images / "rpi-firmware/cmdline.txt"
     files.append(cmdline)

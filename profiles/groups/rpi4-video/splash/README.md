@@ -1,14 +1,15 @@
-# Polis kernel logo
+# Polis splash artwork
 
 `polis-splash.png` is an unchanged copy of the user-supplied 512×512 image at
 `/home/broosegoose/Downloads/polis_icon.png`. It is opaque and retains its teal
 background. Its SHA-256 is
 `2f5afd4c2c57e757939350be8227dae4c275dd2aa0692d7d4ebdeccb4ba884fa`.
-The screen profile embeds this image as its single centered kernel boot logo.
-`polis-splash.ppm` is the preconverted ASCII PPM used by the kernel, preserving
-512×512 dimensions with at most 224 colors. `board/rpi4/kernel-logo.mk` copies
-it into the kernel when `BR2_POLIS_KERNEL_LOGO=y`. Normal builds require no
-ImageMagick download or compilation.
+The screen profile embeds this image in `polis-splash-screen`, its persistent
+Rust DRM client. `polis-splash.ppm` is the preconverted ASCII PPM, preserving
+512×512 dimensions with at most 224 colors. A Rust host helper converts it to
+persistent RGB data; normal builds require no ImageMagick download or compilation.
+The older `board/rpi4/kernel-logo.mk` hook remains available behind
+`BR2_POLIS_KERNEL_LOGO=y`, but screen-dev disables it.
 
 `make configure`, `make build`, and `make image` check the PNG and PPM content
 hashes against `polis-splash.json` before resolving a screen profile's inputs.
@@ -40,8 +41,7 @@ from <https://polis.tv/>.
 
 This reference is not used to regenerate the selected splash.
 
-The kernel uses DRM fbdev emulation and fbcon to draw the logo before userspace.
-The PPM is a build input, not a target file; the PNG is its source artwork.
-The earlier 60×60 icon is reference
-artwork only. Keep serial console logging enabled rather than using `quiet`,
-which suppresses the kernel logo in the pinned kernel.
+The screen profile uses direct DRM/KMS and disables fbdev/fbcon. The persistent
+logo can be redrawn after boot on HDMI hotplug or DRM lastclose. The PPM is a
+build input, not a target file; the PNG is its source artwork. The earlier 60×60
+icon is reference artwork only. Serial console logging remains enabled.

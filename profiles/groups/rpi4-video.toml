@@ -4,13 +4,10 @@ description = "Pi 4 KMS/GBM/EGL/GLES, TC358743 CSI/I2S capture, HDMI audio and V
 provides = ["display", "camera"]
 # Reuse only the no-getty inittab payload; do not select headless restrictions.
 overlays = ["profiles/groups/headless/rootfs-overlay"]
-inputs = ["profiles/groups/rpi4-video/splash/polis-splash.ppm", "board/rpi4/kernel-logo.mk"]
 remove_firmware = ["gpu_mem_256", "gpu_mem_512", "gpu_mem_1024"]
 firmware_overlays = ["vc4-kms-v3d,cma-256", "tc358743,media-controller", "tc358743-audio"]
 
 [buildroot]
-# Use the preconverted logo; CUSTOM_LOGO_PATH would pull in host-imagemagick.
-"BR2_POLIS_KERNEL_LOGO" = "y"
 # Keep the base's shared/static libraries and static core executables. Mesa,
 # Vulkan and applications use shared libraries; no global static linker flags.
 "BR2_PACKAGE_MESA3D" = "y"
@@ -54,22 +51,6 @@ firmware_overlays = ["vc4-kms-v3d,cma-256", "tc358743,media-controller", "tc3587
 "BR2_PACKAGE_MESA3D_LLVM" = "n"
 
 [kernel]
-# Draw the logo through DRM fbdev emulation as soon as simpledrm is available.
-"CONFIG_VT" = "y"
-"CONFIG_VT_CONSOLE" = "y"
-"CONFIG_FB" = "y"
-"CONFIG_FB_CORE" = "y"
-"CONFIG_FB_SIMPLE" = "n"
-# Re-enabling FB must not restore unrelated framebuffer drivers from bcm2711_defconfig.
-"CONFIG_FB_BCM2708" = "n"
-"CONFIG_FB_SSD1307" = "n"
-"CONFIG_FB_RPISENSE" = "n"
-"CONFIG_FB_TFT" = "n"
-"CONFIG_DRM_FBDEV_EMULATION" = "y"
-"CONFIG_FRAMEBUFFER_CONSOLE" = "y"
-"CONFIG_LOGO" = "y"
-"CONFIG_LOGO_LINUX_CLUT224" = "y"
-"CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER" = "n"
 "CONFIG_DRM" = "y"
 "CONFIG_DRM_SIMPLEDRM" = "y"
 "CONFIG_DRM_VC4" = "y"
@@ -120,7 +101,3 @@ firmware_overlays = ["vc4-kms-v3d,cma-256", "tc358743,media-controller", "tc3587
 [cmdline]
 # Retain serial diagnostics without sending kernel messages to HDMI tty1.
 "console" = "ttyAMA0,115200"
-# Do not use quiet/loglevel: fbcon suppresses the logo at quiet log levels.
-"fbcon" = "nodefer,logo-pos:center,logo-count:1"
-"vt.global_cursor_default" = "0"
-"consoleblank" = "0"

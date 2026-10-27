@@ -26,7 +26,7 @@ def parser() -> argparse.ArgumentParser:
     profile_actions = {
         'configure': 'check/prepare the host kernel logo, configure a profile, and display its audit',
         'build': 'check/prepare the host kernel logo and build the reviewed profile configuration',
-        'image': 'check/prepare the host kernel logo, build and snapshot an image with first-boot EEPROM setup (use --development to skip); expand /data during host provisioning',
+        'image': 'check/prepare the host kernel logo, build and snapshot an image with first-boot EEPROM setup; expand /data during host provisioning',
         'audit': 'show the saved profile audit',
         'snapshot': 'snapshot a completed profile build',
     }
@@ -37,12 +37,10 @@ def parser() -> argparse.ArgumentParser:
                              help='override the profile output directory (default: repository .output/)')
         command.add_argument('--ssh-public-key', type=Path,
                              help='development-access public key (default: create/reuse .local/development-ssh/id_ed25519)')
-        command.add_argument('--development', action='store_true',
-                             help='skip first-boot EEPROM setup; storage is never resized on boot')
         if action == 'image':
             command.add_argument('--capture', type=Path, help='also prepare EEPROM changes using these saved diagnostics')
         if action in ('image', 'snapshot'):
-            command.add_argument('--name', help='snapshot name (default: profile-final/development-YYYYMMDD, then -2, -3, etc.)')
+            command.add_argument('--name', help='snapshot name (default: profile-final-YYYYMMDD, then -2, -3, etc.)')
     command = commands.add_parser('prepare-eeprom', parents=[common], help='prepare the EEPROM changes declared by a profile')
     command.add_argument('--profile', required=True, help='TOML profile name')
     command.add_argument('--capture', type=Path, help='EEPROM diagnostics (default: latest saved capture)')
@@ -64,7 +62,7 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--expand-data", action="store_true",
                                  help="grow the final polis-data ext4 partition to fill the card after flashing")
     commands.add_parser("devices", help="list disks and partitions", parents=[common])
-    command = commands.add_parser("smoke", help="boot a development snapshot in QEMU (first-boot setup must be disabled)", parents=[common])
+    command = commands.add_parser("smoke", help="boot a compatible saved snapshot in QEMU (first-boot setup must be disabled)", parents=[common])
     command.add_argument("--snapshot", help="name of a completed capture under --snapshots")
     command.add_argument("--runs", type=int, help="boot count (prompt when omitted; default: 3)")
     command.add_argument("--timeout", type=float, default=120, help="seconds per boot (default: 120)")
@@ -100,7 +98,7 @@ def main(argv=None) -> int:
             if profile is not None:
                 if profile not in ctx.profiles:
                     raise UserError(f"Unknown profile {profile!r}. Use 'profiles' to list choices.")
-                options = dict(development=args.development, ssh_public_key=args.ssh_public_key)
+                options = dict(ssh_public_key=args.ssh_public_key)
                 if args.command == 'image':
                     options['capture'] = args.capture
                 profile_workflow.execute(ctx, args.command, profile, args.output, getattr(args, 'name', None), **options)

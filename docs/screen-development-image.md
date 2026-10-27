@@ -2,40 +2,45 @@
 
 Build `polis-rpi4-screen-dev`. It composes **all of `polis-rpi4-dev`'s feature
 groups**, replacing `headless` with `rpi4-video`, adding `rpi4-uart3`,
-`ffmpeg-libraries`, `rpi4-usb-host` and `screen-graphics-usb`; profiles do not inherit TOML
+`ffmpeg-libraries`, `rpi4-usb-host` and `polis-splash-screen`; profiles do not inherit TOML
 files. Other profiles are unchanged. SSH keys, `polis-dev.local`, Ethernet,
 Wi-Fi setup, persistent storage and `/data/bin/dev-app` behave as described in
 [the development guide](development-image.md).
 The new group reuses the existing no-getty inittab overlay without selecting
 the headless kernel/firmware restrictions, so HDMI does not start a login prompt.
-The display drivers remain simpledrm and VC4. Built-in DRM framebuffer
-emulation and fbcon display the supplied 512×512 Polis icon as the kernel logo.
-The repository includes a preconverted 224-color PPM, copied into the kernel
-before compilation. Builds do not download or compile ImageMagick for the logo;
-no image decoder or splash service is installed on the target. Before profile
-configuration/build, a host Python check regenerates the PPM only if the PNG or
-conversion record has changed, using locally installed `magick`/`convert`.
-Run `python3 -m src.profiles.logo` to prepare it manually, or add `--check` to
-verify freshness without conversion. Unchanged logos need no ImageMagick.
+The display drivers remain simpledrm and VC4. `polis-splash-screen` is a
+built-in Rust DRM client that draws the supplied 512×512 Polis icon on black
+when VC4 initializes. The profile disables legacy fbdev, fbcon, virtual terminals
+and the old kernel-logo path. There is no `/dev/fb0`, HDMI console, cursor or login
+prompt. Kernel messages remain on `console=ttyAMA0,115200`.
 
-`fbcon=nodefer,logo-pos:center,logo-count:1` requests immediate attachment and
-one centered logo. `vt.global_cursor_default=0` hides the cursor and
-`consoleblank=0` disables console blanking. Kernel messages remain on
-`console=ttyAMA0,115200`; there is no HDMI console output or login prompt.
-Do not add `quiet` or lower `loglevel`: this kernel suppresses its boot logo
-at quiet console log levels. The firmware rainbow splash stays disabled.
+The logo remains in kernel memory after boot so a monitor connected later can
+receive it. Each connected output gets a centered logo, scaled down if necessary.
+The splash skips modesetting while an application owns DRM master and reprobes
+outputs when DRM calls its lastclose restoration callback. Applications need no
+splash-specific launch wrapper. Restoration follows DRM lastclose, so another
+open userspace DRM file on the same VC4 device can delay it; merely dropping
+master does not trigger it.
+The first logo appears at VC4 initialization, not at the earlier firmware or
+simpledrm stage. The firmware rainbow splash stays disabled.
 
-The logo can appear when simpledrm's firmware framebuffer becomes available,
-before userspace initialization. Actual visibility and persistence through VC4
-takeover require a hardware boot check; uninterrupted display is not guaranteed.
-After flashing, verify one centered Polis logo, no HDMI text/cursor, serial
-logging, and the later application's takeover. DRM card numbers can change.
+The existing host PNG-to-PPM preparation remains unchanged. The new Rust host
+helper validates that PPM and embeds persistent RGB pixels in the kernel; there
+is no target image decoder, userspace splash service or additional target library.
+Run `python3 -m src.profiles.logo --check` to verify artwork freshness. Only changed
+artwork needs host ImageMagick. Rust bindings use the pinned kernel's real C
+headers and a private Rust adapter; see [implementation and host prerequisites](../package/polis-splash-screen/README.md).
+
+After building and flashing, check boot with a display, boot without a display
+followed by HDMI insertion, unplug/replug, and application takeover/exit. Repeat
+with both HDMI outputs. These are hardware acceptance checks, not claims made by
+the host tests. DRM card numbers can change.
 See the [logo source](../profiles/groups/rpi4-video/splash/README.md).
 
-Prepare the graphics executable first as described in [graphics USB](#graphics-usb-on-the-usb-a-host-ports), then build:
+Build the image directly; no separate graphics executable needs staging:
 
 ```sh
-make image ARGS="--profile polis-rpi4-screen-dev --development"
+make image ARGS="--profile polis-rpi4-screen-dev"
 ```
 
 The command uses the pinned Buildroot 2026.08 tree; override its location with
@@ -43,7 +48,7 @@ The command uses the pinned Buildroot 2026.08 tree; override its location with
 `.output/`: `images/sdcard.img`,
 `profile/audit.txt`, `profile/effective-kernel.config`, and `staging/` (the
 cross-compilation sysroot). A successful automatic image build also prints its
-snapshot directory. `--development` skips EEPROM setup. No image expands
+snapshot directory. First-boot EEPROM setup is enabled. No image expands
 storage on boot; perform expansion during host provisioning.
 Use `make configure` with the same arguments for configuration only.
 
@@ -66,7 +71,7 @@ builds `vulkaninfo`, **not `vkcube`**.
 ALSA capture/playback uses `alsa-lib` and `alsa-utils` (`arecord` and `aplay`).
 These also provide the ALSA headers, library and `alsa.pc` in the staging sysroot.
 
-## Graphics USB on the USB-A host ports
+## Controller USB on the USB-A host ports
 
 `rpi4-usb-host` replaces `usb-peripheral-only` and `no-usb` in this profile.
 It enables built-in USB, VL805 PCIe/xHCI and CDC ACM, plus the existing BCM2711
@@ -77,81 +82,46 @@ SDIO Wi-Fi, UART Bluetooth, UART3, VC4, CSI/I²C/I²S and audio remain selected.
 USB-C gadget diagnostics remain disabled; `usb-diagnostics` conflicts with
 this profile. Other profiles retain their selections.
 
-The Pico is the USB device and graphics client; the Pi is the host and server.
-Controls remain on UART3. `initial-controller` has no graphics USB service.
-This change does not implement storage export, HID or a new graphics protocol.
+The host group also selects `BR2_POLIS_RPI4_VL805_FIRMWARE`: the existing
+`start4.elf` / `fixup4.dat` pair is replaced with the hash-verified upstream
+VL805 decompressor fix. This adds no target package and changes no EEPROM
+settings. See [the firmware hardware test](#firmware-fix-hardware-test--2026-10-22).
 
-### Executable preparation and image build
+The controller is a USB CDC device; the passthru owns its single application
+connection for inputs, HDMI facts, activation and artwork. Production no longer
+uses UART3. The existing `rpi4-uart3` group remains for legacy controller tests.
 
-The application remains owned by `2050-hdmi-passthru`. Build its locked workspace
-with the existing screen SDK, then stage the executable and its reference profile:
+### Application ownership and image build
+
+`hdmi-graphics-hello` and its `polis-graphics-usb` supervisor are retired userspace
+applications, not kernel drivers. The image no longer installs their package,
+boot service, mdev event rule or staged payload. Kernel USB/xHCI/CDC ACM support
+and BusyBox mdev remain enabled. Every profile runs the host-side post-build hook
+`board/rpi4/install-controller-usb.py` to remove the old installed binaries, init
+script, `/usr/share/polis-graphics-usb/` and their mdev rule from reused target
+directories, including after a profile switch. Standard audio, input and module
+rules are preserved. No replacement USB reader is installed by this removal;
+`hdmi-passthru` owns the production controller connection.
+
+Build the image through the normal workflow; no graphics payload preparation is
+required:
 
 ```sh
-# In /home/broosegoose/Polis/2050-hdmi-passthru:
-cargo make graphics-hello-pi-build
-
-# In /home/broosegoose/Polis/BuildrootImages:
-python3 package/polis-graphics-usb/prepare.py --app ../2050-hdmi-passthru
-python3 package/polis-graphics-usb/prepare.py --check
-make configure ARGS="--profile polis-rpi4-screen-dev --development"
-make image ARGS="--profile polis-rpi4-screen-dev --development"
+make configure ARGS="--profile polis-rpi4-screen-dev"
+make image ARGS="--profile polis-rpi4-screen-dev"
 ```
 
-Preparation copies `.target/aarch64-unknown-linux-musl/release/hdmi-graphics-hello`
-and `assets/devices/screen-controller-graphics.toml` into ignored
-`.local/graphics-usb/`, recording their hashes. It checks AArch64 ELF, the musl
-interpreter, and a dependency allowlist of existing `libc.so`/`libgcc_s.so.1`;
-additional shared libraries fail preparation and require explicit approval.
-It also rejects changes to the expected descriptor contract. Restage after
-rebuilding the app. The profile audit hashes the staged files; the incremental
-package rule reinstalls them when their content changes. Fresh checkouts must
-prepare this payload before configuring the screen profile. No app repository
-source is modified or compiled by the image package.
+Outputs remain `.output/images/sdcard.img`, `.output/profile/audit.txt` and
+`.output/profile/effective-kernel.config`. Image building/flashing is separate
+from the host checks for this removal.
 
-The package installs `/usr/bin/hdmi-graphics-hello`, the reference TOML and
-manifest in `/usr/share/polis-graphics-usb/`, and the libc-only
-`/usr/sbin/polis-graphics-usb` supervisor. The worker uses the app's built-in
-identity constants and receives exactly `--port /dev/ttyACM<N>`; the installed
-TOML is also available for explicit manual `--profile` checks. No Python,
-udev, systemd or new shared-library dependency is added to the development
-image. Host Python/readelf validate the staged payload.
-
-Outputs remain `.output/images/sdcard.img`, `.output/profile/audit.txt`,
-`.output/profile/effective-kernel.config` and `.output/staging/`. Image compilation,
-boot and hardware acceptance are separate checks; no image build or deployment
-was performed for this change, following this repository's build policy.
-
-### Device events, lifecycle and logs
-
-The image retains BusyBox init and devtmpfs and activates its already-built
-BusyBox mdev daemon through Buildroot's `S10mdev`. mdev opens its kernel event
-socket before its initial coldplug scan. `S09polis-graphics-usb` starts the
-supervisor first. The post-build hook prepends one ttyACM rule to the standard
-mdev configuration, retaining audio, input and module rules.
-
-The event helper only sends a bounded local datagram; no worker runs inside
-mdev's handler. For coldplug, where BusyBox does not supply `DEVPATH`, it resolves
-only the supplied tty's sysfs path. The supervisor checks that endpoint's USB
-ancestors for VID `2e8a`, PID `0009`, manufacturer `Polis`, product
-`Polis Screen Graphics`, and control interface `00`. There is no serial-number
-assumption. BOOTSEL, interface `01`, and other devices sharing the CDC VID/PID
-are excluded. The app checks the supplied endpoint again before opening it.
-
-Workers run as root, with mdev nodes `root:root 0660`. One supervisor lock and
-one worker slot per kernel tty prevent duplicate launches, including repeated
-coldplug events. Up to 128 simultaneous endpoints are supported. A tty's sysfs
-inode and topology path distinguish attachments; a replacement waits for the
-old child to be reaped. Remove events send SIGTERM and escalate to SIGKILL after
-two seconds. Worker exit schedules a one-second restart after rechecking that
-same attachment. These timers supervise known children; there is no device
-polling loop. Parent-death signals stop workers if the supervisor dies.
-
-`/etc/init.d/S09polis-graphics-usb restart` terminates/reaps current workers and
-requests a fresh `mdev -s` coldplug scan. It also recovers from a supervisor
-crash when restarted manually. Logs include tty, worker PID and exit status;
-stdout/stderr go through the existing rotating syslog service to
-`/var/log/messages`. Runtime lock/socket state lives under
-`/run/polis-graphics-usb/`; the init PID file is `/run/polis-graphics-usb.pid`.
+Deploy the application from `2050-hdmi-passthru` with `cargo make passthru`.
+When controller options are enabled, its helper stops the retired supervisor on
+older running images before opening USB. That handoff lasts until reboot;
+rebuilding and flashing this image removes
+the old boot service permanently. The application handles controller discovery,
+coldplug and reconnect itself. See the
+[controller integration guide](../../2050-hdmi-passthru/docs/screen-controller-integration.md).
 
 ### VL805 timeout evidence and prerequisites
 
@@ -172,70 +142,170 @@ Inspection of pinned Linux `21b410140c47ffab5668399f6f143c7d7b935c8b` found:
 | PCIe and firmware drivers | Existing effective config already had `PCIE_BRCMSTB`, `RASPBERRYPI_FIRMWARE` and `RESET_RASPBERRYPI`; the new group requires them built-in, plus mailbox/reset support. |
 | Device-tree reset wiring | `bcm2711-rpi-4-b.dts` and the existing compiled DTB contain `/scb/pcie@7d500000/pci@0,0/usb@0,0` with reset ID 0 referencing `raspberrypi,firmware-reset`. PCIe has no disabling status property. |
 | Reset handshake | `drivers/usb/host/xhci-pci.c:xhci_pci_common_probe()` obtains and invokes the reset controller before registering the USB bus. `drivers/reset/reset-raspberrypi.c` sends `RPI_FIRMWARE_NOTIFY_XHCI_RESET` for PCI address `0x100000`, then waits 200–1000 microseconds. Its comments describe the VideoCore firmware/VL805 loading path. |
-| Boot firmware selection | The profile keeps full `start4.elf` / `fixup4.dat`, not cut-down firmware. Buildroot pins `raspberrypi/firmware` to `063bcab6c8a90efb0d19f69d88cbbc7ec79cab68`. No pin, EEPROM configuration or DT reset wiring was changed. |
+| Boot firmware selection before the fix | Full `start4.elf` / `fixup4.dat`, not cut-down firmware, from Buildroot's `raspberrypi/firmware` pin `063bcab6c8a90efb0d19f69d88cbbc7ec79cab68`. |
 
-The evidence establishes prerequisites, not the cause of the timeout. The
-capture does not identify the failing reset/readiness handshake. Re-enabled
-host support may reproduce the delay and block all Pico enumeration. Capture
-a fresh full UART boot log before diagnosing firmware or hardware; do not
-perform speculative EEPROM updates, PCI reset quirks or board changes.
+Those initial checks established prerequisites without isolating the cause.
+The firmware experiment below subsequently resolved the timeout without
+EEPROM updates, PCI reset quirks or board changes.
+
+#### Rebuilt-image hardware test — 2026-10-22
+
+One fresh normal power cycle through the running SBC-controller daemon
+reproduced the timeout on the user's newly flashed image:
+
+| Event | Kernel uptime |
+| --- | --- |
+| PCIe link up, 5.0 GT/s x1 | 0.632714 s |
+| VL805 xHCI controller setup starts | 1.044681 s |
+| `can't setup: -110`; controller probe fails | 18.127516 s |
+| CDC ACM interface driver registers | 18.127642 s |
+
+The controller setup stall was **17.082835 seconds**. Enabling host USB and
+CDC ACM did not resolve it; ACM driver registration does not establish that
+the failed controller can enumerate a Pico. The boot firmware reported the
+same version/hash as the earlier capture. This result does not isolate the
+underlying reset/readiness failure or establish a general firmware/hardware
+diagnosis.
+
+Fresh UART bytes, capture hash/timings, and post-test controller status are
+saved locally under `.local/usb-host-timeout-check-2026-10-22/` as
+`boot-uart.log`, `result.json`, and `status-after.json`. The capture begins at
+host UART byte offset 409088, recorded in `start.json`, excluding older boots.
+UART errors remained at the pre-test count of 1; overruns, dropped/lost bytes,
+and USB transmit failures remained zero. The Pi was left powered on. No flash,
+recovery operation, configuration change or image build was performed by this
+test. Successful USB enumeration and graphics exchanges remain unverified.
+
+#### Firmware fix hardware test — 2026-10-22
+
+Raspberry Pi maintainers identified a missing VL805 firmware decompressor in
+`start4.elf`: USB can fail when the EEPROM bootloader has not already loaded
+the controller firmware. See [firmware issue #2026](https://github.com/raspberrypi/firmware/issues/2026)
+and [the upstream fix](https://github.com/raspberrypi/firmware/commit/0e05e17767d62a60cc2fafaafbdc42aaead3984b).
+The issue was reported with secure boot, but the missing decoder also affects
+other boot paths that leave VL805 initialization to `start4.elf`.
+
+Using the repaired USB recovery connection, we backed up the actual SD boot
+partition and replaced only `start4.elf` and `fixup4.dat` with the pair from
+commit `0e05e17767d62a60cc2fafaafbdc42aaead3984b`. Changed sectors were confined
+to that partition; its complete contents and the unchanged MBR passed direct
+readback verification. Rootfs, data, kernel, DTBs, overlays and EEPROM were
+not modified. The firmware now reports `2026-05-08T18:13:05`, hash
+`ae9a8ea9f3ca745de6f357bd7fc8307721ad38b7`.
+
+| Fresh normal boot | xHCI starts | Both root hubs initialized | Elapsed | Result |
+| --- | --- | --- | --- | --- |
+| Original firmware | 1.044681 s | Failed at 18.127516 s | 17.082835 s | `can't setup: -110` |
+| Fixed firmware | 1.049255 s | 1.051751 s | 2.496 ms | USB 2/3 root hubs and onboard VIA hub enumerate |
+| Fixed firmware, five-second power-off interval | 1.030393 s | 1.032796 s | 2.403 ms | Same success, no timeout |
+
+This isolates the fix to the boot firmware pair and is consistent with the
+upstream decompressor diagnosis. Enabling kernel USB support alone did not
+fix the problem. The Pi is left powered on in Normal mode with the fixed
+pair installed. Serial logs and EROFS/userspace startup were observed; a
+graphics Pico exchange, UART3 controls and display/capture operation were
+not exercised in this timeout test.
+
+Evidence is under `.local/usb-host-timeout-check-2026-10-22/`:
+`card-boot-before.img` is the rollback backup; `card-firmware-test.json`
+records deployment and direct readback; `fixed-boot-uart.log`,
+`repeat-boot-uart.log`, and their `*-result.json` files record the two boots.
+The generic daemon `run` waited for `POLIS_SMOKE_READY init`, which this
+profile does not emit. That marker-only observation was intentionally
+interrupted by restarting the daemon; its journal is not a readiness pass.
+The subsequent direct `cycle --off-ms 5000` completed. The controller
+reconnected after a transient framing error during restart; UART errors
+remained at 1 and UART overrun/drop/loss counters remained zero. USB transmit
+failures rose during the restart and remained at 24 through the repeat test.
+
+The maintained selection is in `profiles/groups/rpi4-usb-host.toml` and
+`board/rpi4/vl805-firmware.mk`, with SHA-256 pins in
+`board/rpi4/vl805-firmware.hash`. Buildroot downloads the pair and installs it
+after the original firmware package. Incremental tracking invalidates the
+firmware source/install steps when this selection or its pin changes, including
+when disabling the override. Other profiles keep their original firmware.
+
+Validation passed: isolated Buildroot `olddefconfig`, real package-variable
+expansion, official Buildroot hash checks, enabled/disabled install-hook
+checks, 34 focused profile tests, and 18 incremental-build tests. No image, kernel or toolchain build
+was run during that experiment. At that point `.output/images/sdcard.img`
+still contained the old firmware; the hardware test changed the SD card directly. To produce a
+reproducible updated image, run:
+
+```sh
+make image ARGS="--profile polis-rpi4-screen-dev"
+```
+
+The resulting image is `.output/images/sdcard.img`; the firmware pair is in
+`.output/images/rpi-firmware/`. The subsequent user-built image was tested below.
+
+#### Rebuilt fixed-image acceptance — 2026-10-22
+
+After the user rebuilt and flashed the image, an SBC-controller
+`cycle --off-ms 5000` completed in Normal mode. Fresh UART capture began at
+host byte offset 540394. The running firmware reported the expected
+`2026-05-08T18:13:05` version and
+`ae9a8ea9f3ca745de6f357bd7fc8307721ad38b7` hash.
+
+| Event | Kernel uptime |
+| --- | --- |
+| xHCI setup starts | 1.023632 s |
+| USB 2 root hub initialized | 1.025535 s |
+| USB 3 root hub initialized | 1.026028 s |
+| Onboard VIA hub initialized | 3.179805 s |
+| EROFS root mounted | 3.352125 s |
+
+Both root hubs initialized in **2.396 ms**, with no `can't setup: -110`.
+Userspace reached Dropbear startup. UART error counters did not increase:
+errors remained at 1, overruns/dropped/lost bytes at zero, and controller USB
+transmit failures at 24. The Pi was left powered on in Normal mode. No
+recovery, flash, firmware replacement or build was performed during this check.
+This verifies the timeout fix in the newly flashed image; it does not verify
+graphics Pico exchanges, UART3 controls or display/capture operation.
+
+The local `.output/images/sdcard.img` has SHA-256
+`dde4a1a30b53c0cf0dae542915f959354a1a1bae30c5f614f9e250cda9270332`.
+Reading its FAT partition confirmed both firmware files match the pinned
+hashes. This is a local artifact check, not a whole-card readback claim.
+Evidence is in `.local/usb-host-rebuilt-check-2026-10-22/`: `start.json`,
+`boot-uart.log`, `result.json`, `status-after.json`, and `local-image.json`.
 
 ### Verification on the rebuilt Pi
 
-1. Check controller initialization and CDC binding with a graphics Pico in a
-   **USB-A** port. Record the full boot log and elapsed xHCI probe time; require
-   successful root-hub initialization and no `can't setup: -110`:
+1. Connect the production controller to a USB-A port and check CDC binding:
 
    ```sh
    dmesg | grep -Ei 'brcm-pcie|xhci|usb|cdc_acm'
    readlink -f /sys/class/tty/ttyACM0/device/driver
-   ps | grep -E 'mdev|polis-graphics-usb|hdmi-graphics'
-   tail -n 60 /var/log/messages
    ```
 
    Substitute the actual tty number. Its interface driver should be `cdc_acm`.
-   A missing tty after xHCI failure is a controller problem, not an app problem.
+   A missing tty after xHCI failure is a controller initialization problem.
+2. Confirm `/usr/bin/hdmi-graphics-hello`, `/usr/sbin/polis-graphics-usb` and
+   `/etc/init.d/S09polis-graphics-usb` are absent. There must be no mdev rule
+   launching the retired supervisor.
+3. From the application repository run `cargo make passthru`. Confirm the
+   controller receives real HDMI facts and Tile artwork. Unplug/replug USB and
+   verify the same passthru process reconnects. It selects exactly one matching
+   controller unless `--controller-port` is explicit.
+4. Recheck HDMI/KMS, CSI video, I²S/ALSA audio, Ethernet, Wi-Fi, SSH and the UART0
+   development console. Legacy UART3 checks remain below.
 
-2. Boot with two matching Picos already attached. Require two distinct
-   `hdmi-graphics-hello --port /dev/ttyACM<N>` workers and successful lookups
-   from both. Run `mdev -s` again; neither PID should change or duplicate.
-   Unplug one, confirm its worker exits within two seconds, then reconnect it
-   and confirm a fresh worker and lookup. Repeat after boot with both initially
-   disconnected to exercise hotplug.
+Host validation (from the repository root):
 
-3. Kill one worker using its PID from the log (`kill -KILL PID`); require a new
-   PID after one second while the other worker continues. Run
-   `/etc/init.d/S09polis-graphics-usb restart`; require one replacement per
-   attached Pico. Attach an unrelated CDC device with the same VID/PID, and
-   test BOOTSEL: neither may acquire a graphics worker. Check descriptor files
-   under the tty's USB ancestors when investigating exclusion.
+```sh
+PYTHONPATH=tests python3 -m unittest test_screen_development test_controller_usb test_profile_inputs test_profiles test_incremental
+python3 -m src.profiles.schema --check
+```
 
-4. For a manual protocol smoke check, stop automatic workers first to avoid
-   two readers on the port. Run these as separate commands; the Pico initiates
-   Hello and retries while the server is absent:
-
-   ```sh
-   /etc/init.d/S09polis-graphics-usb stop
-   hdmi-graphics-hello --port /dev/ttyACM0 --once
-   /etc/init.d/S09polis-graphics-usb start
-   ```
-
-   Success prints `Pico received hello world (11 bytes)`. Restart the service
-   even if the manual test fails. Events during the stop can log delivery
-   failures; the service's next coldplug scan recovers present devices.
-
-5. Recheck UART3 controls, UART0 development console, HDMI/KMS output, CSI
-   video, I²S/ALSA audio, Ethernet, Wi-Fi and SSH using the checks below. All
-   live USB, timing and regression checks remain unverified until hardware
-   execution. Host tests use synthetic sysfs and PTYs; they do not prove a
-   controller, firmware, CDC protocol exchange or image boot.
-
-Host validation is reproducible with `python3 -m unittest discover -s tests
--p 'test_*.py'`, `python3 -m src.profiles.schema --check` and the preparation /
-configuration commands above. The lifecycle tests require a host C compiler
-and permission to bind temporary Unix sockets; they use no real USB hardware.
+These checks do not establish that a new image builds or boots; physical
+acceptance requires the rebuilt image.
 
 ## Pico control surface on UART3
+
+This section covers legacy controller hardware. The production controller uses
+the single USB connection owned by `hdmi-passthru` for controls, HDMI facts and
+artwork.
 
 The reusable `rpi4-uart3` group is selected by `polis-rpi4-screen-dev`.
 It emits **`dtoverlay=uart3`**, installs the official firmware overlays in
@@ -451,7 +521,7 @@ No image/kernel build or hardware test was performed for this change.
 Run the next build yourself:
 
 ```sh
-make image ARGS="--profile polis-rpi4-screen-dev --development"
+make image ARGS="--profile polis-rpi4-screen-dev"
 ```
 
 Review `.output/profile/config.txt` for `dtoverlay=uart3` and the preserved

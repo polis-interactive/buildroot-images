@@ -15,7 +15,7 @@ under `/usr/lib`. The shared `development-access` group requires OF/configfs
 overlay support and installs the firmware overlay files. It does not install
 `dtc` command-line tools, `dtparam`, target `dtmerge`, or extra services. The
 utility uses writable `/tmp/.dtoverlays` for its runtime state. This package is
-selected by the dev profiles, not by the `--development` provisioning flag.
+selected by the dev profiles.
 
 The boot partition is not automatically mounted; use an explicit read-only
 mount and `dtoverlay -d` as shown in the
@@ -26,8 +26,8 @@ the utility; existing images are unchanged. Both use `.output/images/sdcard.img`
 so retain the first build's printed snapshot before building the other:
 
 ```sh
-make image ARGS="--profile polis-rpi4-dev --development"
-make image ARGS="--profile polis-rpi4-screen-dev --development"
+make image ARGS="--profile polis-rpi4-dev"
+make image ARGS="--profile polis-rpi4-screen-dev"
 ```
 
 The `polis-rpi4-base` profile includes the same
@@ -45,7 +45,7 @@ verification of the promoted base profile remains separate.
 BUILDROOT_IMAGES=/absolute/path/to/BuildrootImages
 BUILDROOT=/absolute/path/to/buildroot-2026.08
 make -C "$BUILDROOT_IMAGES" image \
-  ARGS="--profile polis-rpi4-dev --development --buildroot $BUILDROOT --downloads $BUILDROOT_IMAGES/dl"
+  ARGS="--profile polis-rpi4-dev --buildroot $BUILDROOT --downloads $BUILDROOT_IMAGES/dl"
 ```
 
 The first build generates an Ed25519 identity at
@@ -56,11 +56,10 @@ To use an existing public key, pass `--ssh-public-key /absolute/path/key.pub`
 to every staged configure/build/snapshot command. A private-key file is rejected.
 Keep the generated private key to access this image on later boots.
 
-`--development` is the existing provisioning-mode flag: it skips EEPROM setup.
+Images apply the profile's EEPROM settings during first-boot setup.
 No image resizes storage on boot; expansion belongs to host provisioning.
-The **profile** selects the development
-packages. Selecting this flag on the speed profile does not add SSH or Ethernet.
-Use the same mode and public key when rebuilding. No build command flashes a card.
+The **profile** selects development packages such as SSH and Ethernet.
+Use the same profile and public key when rebuilding. No build command flashes a card.
 
 All profiles use [`profiles/buildroot.lock.json`](../profiles/buildroot.lock.json),
 which pins only the Buildroot source archive and input-tree digest. Buildroot

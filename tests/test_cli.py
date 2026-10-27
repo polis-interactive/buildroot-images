@@ -80,6 +80,19 @@ class ToolsTest(unittest.TestCase):
                     patch.object(cli.profile_workflow, 'execute') as execute:
                 self.assertEqual(cli.main([action, '--profile', 'polis-rpi4-speed']), 0)
                 self.assertEqual(execute.call_args.args[1:3], (action, 'polis-rpi4-speed'))
+                self.assertNotIn('development', execute.call_args.kwargs)
+
+    def test_profile_actions_reject_removed_development_flag(self):
+        for action in ('configure', 'build', 'image', 'snapshot', 'audit'):
+            with self.subTest(action=action), patch.object(cli.profile_workflow, 'execute') as execute:
+                with contextlib.redirect_stderr(StringIO()), self.assertRaises(SystemExit) as error:
+                    cli.main([action, '--profile', 'polis-rpi4-speed', '--development'])
+                self.assertEqual(error.exception.code, 2)
+                execute.assert_not_called()
+                with contextlib.redirect_stdout(StringIO()) as output, self.assertRaises(SystemExit) as help_exit:
+                    cli.main([action, '--help'])
+                self.assertEqual(help_exit.exception.code, 0)
+                self.assertNotIn('--development', output.getvalue())
 
     def test_eeprom_stage_uses_the_profile_output_override(self):
         with patch.object(cli, 'REPO', self.repo), patch.object(cli.profile_workflow, 'execute') as execute:
