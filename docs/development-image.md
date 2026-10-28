@@ -9,6 +9,12 @@ and Broadcom PHY drivers with DHCP; iwd owns Wi-Fi association and addressing.
 The development profile includes system D-Bus, Pi Wi-Fi firmware, `iwctl`, the
 wifi-setupd portal, key-only Dropbear SSH, and Avahi. It does not select `no-ethernet`.
 
+Both development profiles enable the BusyBox `stat` applet with custom format
+support (`CONFIG_STAT` and `CONFIG_FEATURE_STAT_FORMAT`). Incremental application
+deployment uses `stat -c %a` to compare installed file permissions alongside
+SHA-256 contents. Rebuild and boot the updated image to add it to an existing
+device; the base profile does not select these options.
+
 Both `polis-rpi4-dev` and `polis-rpi4-screen-dev` also select the explicitly
 approved runtime overlay utility `/usr/bin/dtoverlay` and its `libfdt` dependency
 under `/usr/lib`. The shared `development-access` group requires OF/configfs

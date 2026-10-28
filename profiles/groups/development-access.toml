@@ -41,6 +41,9 @@ inputs = ["profiles/groups/development-access/dropbear-localoptions.h", "package
 "CONFIG_CONFIGFS_FS" = "y"
 
 [busybox]
+# Approved development tooling: deployment compares file modes with stat -c %a.
+"CONFIG_STAT" = "y"
+"CONFIG_FEATURE_STAT_FORMAT" = "y"
 "CONFIG_SYSLOGD" = "y"
 "CONFIG_FEATURE_ROTATE_LOGFILE" = "y"
 "CONFIG_START_STOP_DAEMON" = "y"
