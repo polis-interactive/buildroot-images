@@ -1,0 +1,12 @@
+schema = 1
+id = "picotool"
+description = "Pico inspection and programming tool on the Pi's USB host ports."
+requires = ["rpi4-usb-host"]
+
+[buildroot]
+# Target picotool and libusb are approved for the screen image.
+"BR2_PACKAGE_PICOTOOL" = "y"
+"BR2_PACKAGE_LIBUSB" = "y"
+"BR2_PACKAGE_LIBUSB_EXAMPLES" = "n"
+# Buildroot installs the SDK only in staging, never in the target rootfs.
+"BR2_PACKAGE_PICO_SDK" = "y"

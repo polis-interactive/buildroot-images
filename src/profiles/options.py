@@ -40,6 +40,7 @@ class Group(StrEnum):
     RPI4_UART3 = "rpi4-uart3"
     FFMPEG_LIBRARIES = "ffmpeg-libraries"
     RPI4_USB_HOST = "rpi4-usb-host"
+    PICOTOOL = "picotool"
     UART_DIAGNOSTICS = "uart-diagnostics"
     USB_DIAGNOSTICS = "usb-diagnostics"
     KERNEL_ENTRY_MARKER = "kernel-entry-marker"

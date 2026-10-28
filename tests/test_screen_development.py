@@ -33,7 +33,7 @@ class ScreenDevelopmentTests(unittest.TestCase):
         self.assertEqual(set(screen.profile.groups),
                          set(dev.profile.groups) - {Group.HEADLESS}
                          | {Group.RPI4_VIDEO, Group.RPI4_UART3, Group.FFMPEG_LIBRARIES,
-                            Group.RPI4_USB_HOST, Group.POLIS_SPLASH_SCREEN})
+                            Group.RPI4_USB_HOST, Group.PICOTOOL, Group.POLIS_SPLASH_SCREEN})
         self.assertTrue(set(dev.profile.requires) <= set(screen.profile.requires))
         for group in (Group.WIFI_IWD, Group.WIFI_SETUPD, Group.DEVELOPMENT_ACCESS):
             for domain in ('buildroot', 'kernel', 'busybox'):
@@ -93,6 +93,44 @@ class ScreenDevelopmentTests(unittest.TestCase):
                     self.assertFalse(any('.local/graphics-usb' in path
                                          for group in plan.groups.values()
                                          for path in group.get('inputs', [])))
+
+    def test_screen_supports_gzip_tar_deployment(self):
+        plan = resolver.resolve(self.ctx, 'polis-rpi4-screen-dev')
+        output = self.root / 'gzip-tar'
+        resolver.write_generated(self.ctx, plan, output)
+        fragment = resolver.read_kconfig(output / 'profile/busybox.fragment')
+        self.assertEqual(fragment['CONFIG_FEATURE_SEAMLESS_GZ'], 'y')
+        for name in self.ctx.profiles:
+            if name != 'polis-rpi4-screen-dev':
+                with self.subTest(profile=name):
+                    other = resolver.resolve(self.ctx, name)
+                    self.assertNotEqual(other.values['busybox'].get('CONFIG_FEATURE_SEAMLESS_GZ'), 'y')
+
+    def test_picotool_is_selected_only_by_the_screen_image(self):
+        for name in self.ctx.profiles:
+            with self.subTest(profile=name):
+                plan = resolver.resolve(self.ctx, name)
+                selected = name == 'polis-rpi4-screen-dev'
+                self.assertEqual(Group.PICOTOOL in plan.groups, selected)
+                for symbol in ('BR2_PACKAGE_PICOTOOL', 'BR2_PACKAGE_LIBUSB',
+                               'BR2_PACKAGE_PICO_SDK'):
+                    self.assertEqual(plan.values['buildroot'].get(symbol) == 'y', selected)
+                if selected:
+                    requested = resolver.write_generated(self.ctx, plan, self.root / 'picotool')
+                    self.assertEqual(requested['BR2_PACKAGE_LIBUSB_EXAMPLES'], 'n')
+                    self.assertIn(Group.RPI4_USB_HOST, plan.groups)
+                    with self.assertRaisesRegex(UserError, 'BR2_PACKAGE_PICOTOOL'):
+                        workflow.check_values(requested,
+                                              dict(requested, BR2_PACKAGE_PICOTOOL='n'),
+                                              'Buildroot', REPO, self.root / 'picotool')
+
+    def test_picotool_requires_host_usb(self):
+        profile = load_profile(REPO / 'profiles/polis-rpi4-screen-dev.toml')
+        profile = replace(profile, groups=tuple(g for g in profile.groups
+                                               if g != Group.RPI4_USB_HOST), requires=())
+        with patch.object(resolver, 'load_profile', return_value=profile):
+            with self.assertRaisesRegex(UserError, 'rpi4-usb-host'):
+                resolver.resolve(self.ctx, profile.name)
 
     def test_ffmpeg_is_library_only_and_audited(self):
         plan = resolver.resolve(self.ctx, 'polis-rpi4-screen-dev', development=True)

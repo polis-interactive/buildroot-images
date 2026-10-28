@@ -2,7 +2,7 @@
 
 Build `polis-rpi4-screen-dev`. It composes **all of `polis-rpi4-dev`'s feature
 groups**, replacing `headless` with `rpi4-video`, adding `rpi4-uart3`,
-`ffmpeg-libraries`, `rpi4-usb-host` and `polis-splash-screen`; profiles do not inherit TOML
+`ffmpeg-libraries`, `rpi4-usb-host`, `picotool` and `polis-splash-screen`; profiles do not inherit TOML
 files. Other profiles are unchanged. SSH keys, `polis-dev.local`, Ethernet,
 Wi-Fi setup, persistent storage and `/data/bin/dev-app` behave as described in
 [the development guide](development-image.md).
@@ -70,6 +70,23 @@ Weston, GStreamer or libcamera is selected. Buildroot's Vulkan tools recipe
 builds `vulkaninfo`, **not `vkcube`**.
 ALSA capture/playback uses `alsa-lib` and `alsa-utils` (`arecord` and `aplay`).
 These also provide the ALSA headers, library and `alsa.pc` in the staging sysroot.
+
+The maintained `rpi4-video` BusyBox fragment enables `CONFIG_FEATURE_SEAMLESS_GZ`
+so the existing `tar` applet accepts `tar -xzf` for passthru deployment archives.
+It uses BusyBox's built-in gzip decompression without adding a target package.
+
+## Pico tools on the Pi
+
+The screen image selects Buildroot's `picotool` 2.3.0 package and the approved
+`libusb` runtime dependency. After building and installing the image, the Pi
+provides `/usr/bin/picotool` and libusb under `/usr/lib`. The Pico SDK is a build
+input installed only in the staging sysroot. Other profiles do not select these
+packages, and libusb example programs are disabled.
+
+For a read-only check on the Pi, connect a Pico in BOOTSEL mode to a USB-A port
+and run `picotool info` as root. The existing USB host drivers and mdev provide
+device access; this does not require a mass-storage driver or a new service.
+Compilation and device access still need verification on the rebuilt image.
 
 ## Controller USB on the USB-A host ports
 

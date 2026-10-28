@@ -50,6 +50,10 @@ firmware_overlays = ["vc4-kms-v3d,cma-256", "tc358743,media-controller", "tc3587
 "BR2_PACKAGE_LIBCAMERA" = "n"
 "BR2_PACKAGE_MESA3D_LLVM" = "n"
 
+[busybox]
+# Passthru deployment extracts gzip-compressed tar archives with tar -xzf.
+"CONFIG_FEATURE_SEAMLESS_GZ" = "y"
+
 [kernel]
 "CONFIG_DRM" = "y"
 "CONFIG_DRM_SIMPLEDRM" = "y"

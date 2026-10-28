@@ -63,6 +63,7 @@
           "rpi4-uart3",
           "ffmpeg-libraries",
           "rpi4-usb-host",
+          "picotool",
           "uart-diagnostics",
           "usb-diagnostics",
           "kernel-entry-marker",
